@@ -25,6 +25,7 @@ dt { color:var(--mut); } dd { margin:0; text-align:right; }
 .mode { display:inline-block; margin-top:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); } .mode.safe { color:var(--ok); border-color:var(--ok); } .mode.risk { color:var(--warn); border-color:var(--warn); }
 .pos { color:var(--ok); } .neg { color:var(--bad); }
 </style>
+<style>.tw{overflow-x:auto} table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums} th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap} th:first-child,td:first-child{text-align:left} th{color:var(--mut);font-weight:500} td .mode{margin:0 0 0 4px;font-size:11px;padding:0 6px}</style>
 </head><body><main id="app"></main>
 <script id="initial" type="application/json">{"time": "2026-11-06T18:15:23.447Z", "since": "2026-11-06T12:34:36.418Z", "modes": {"safe": true, "risk": true}, "equity": "177871.84", "harvest": [{"symbol": "HYPEUSDT", "enteredAt": "2026-11-06T15:07:20.974Z", "spotEntry": null, "shortEntry": null, "qty": "12.75", "hours": 3.1, "spot": -0.18, "short": 1.2, "funding": 0.1, "fees": 1.55, "net": -0.43}, {"symbol": "NEARUSDT", "enteredAt": "2026-11-06T15:07:22.122Z", "spotEntry": null, "shortEntry": null, "qty": "266.1", "hours": 3.1, "spot": -3.99, "short": 6.49, "funding": 0.01, "fees": 1.55, "net": 0.96}], "open": [{"symbol": "XLMUSDT", "side": "Buy", "size": "1598", "entry": 0.1566, "enteredAt": "2026-11-06T17:00:40.733Z", "sl": 0.149, "tp": 0.1638, "mark": 0.1553, "pnl": -2.08, "rule": "funding(th=0.0002,sl=8,tp=8,H=1440,exec=taker)"}], "closed": []}</script>
 <script>
@@ -41,8 +42,17 @@ const rule = r => (r||'').startsWith('funding') ? 'перекос финанси
 const side = s => s === 'Buy' ? 'покупка' : 'продажа';
 const card = (title, res, rows, mode) => `<div class="trade"><div class="top"><span class="name">${esc(title)}</span><span class="res ${cls(res)}">${m(res)} USDT</span></div>${mode ? `<span class="mode ${mode.startsWith('без') ? 'safe' : 'risk'}">Режим: ${mode}</span>` : ''}<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl></div>`;
 
+let LIVE = {}, liveAt = 0;
+function coinsSec(d) {
+  const cs = d.coins || []; if (!cs.length) return '';
+  const rows = cs.map(c => { const lp = LIVE[c.s + 'USDT']; const pr = lp ? lp.ps : c.p;
+    const st = c.h ? '<span class="mode safe">сбор финансирования</span>' : c.o ? '<span class="mode risk">открыта сделка</span>' : c.a ? '<span class="mode risk">сигнал ' + (c.a > 0 ? 'вверх' : 'вниз') + '</span>' : '';
+    return `<tr><td><b>${esc(c.s)}</b> ${st}</td><td>${pr}</td><td class="${cls(lp ? lp.ch : c.ch)}">${lp ? (lp.ch > 0 ? '+' : '') + lp.ch.toFixed(2) + '% 24ч' : (c.ch > 0 ? '+' : '') + c.ch + '% 15м'}</td><td>${c.f}%</td><td class="${cls(c.sc)}">${c.sc > 0 ? '+' : ''}${c.sc}</td></tr>`; }).join('');
+  return `<section><h2>Все монеты (${cs.length})</h2><p class="note">Бот следит за всеми этими монетами. «Пульс» от −100 до +100 — куда давит рынок прямо сейчас (плюс — вверх, минус — вниз). Финансирование — сколько лонги платят шортам за 8 часов.${liveAt ? ' Цены — прямо с биржи, обновлены ' + new Date(liveAt).toLocaleTimeString('ru-RU', {timeZone: 'Europe/Moscow'}) + '.' : ''}</p><div class="tw"><table><thead><tr><th>Монета</th><th>Цена</th><th>Изменение</th><th>Финанс.</th><th>Пульс</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
 function render(d, fresh) {
-  const hv = d.harvest || [], op = d.open || [], cl = d.closed || [];
+  const hv = d.harvest || [], cl = d.closed || [];
+  const op = (d.open || []).map(x => { const lp = LIVE[x.symbol]; if (!lp) return x; const sz = +x.size, dir = x.side === 'Buy' ? 1 : -1; return { ...x, mark: lp.p, pnl: +((lp.p - x.entry) * sz * dir).toFixed(2) }; });
   const sum = (a, f) => a.reduce((s, x) => s + (+f(x) || 0), 0);
   const hnet = sum(hv, x => x.net), hfund = sum(hv, x => x.funding), opnl = sum(op, x => x.pnl), cpnl = sum(cl, x => x.pnl), cw = cl.filter(x => x.pnl > 0).length;
   const ageMin = (Date.now() - new Date(d.time)) / 60000;
@@ -54,7 +64,7 @@ function render(d, fresh) {
   const on = v => v === false ? 'выкл' : 'вкл';
   document.getElementById('app').innerHTML = `
 <header><h1>Пульс — демо-торговля бота</h1>
-<p class="lead">Демо-счёт Bybit, ненастоящие деньги. Время московское. Данные на ${t(d.time)}, бот работает с ${t(d.since)}. Страница сама обновляется каждую минуту.</p></header>
+<p class="lead">Демо-счёт Bybit, ненастоящие деньги. Время московское. Данные на ${t(d.time)}, бот работает с ${t(d.since)}. Страница обновляется сама: сделки — каждую минуту, цены — каждые 10 секунд.</p></header>
 ${state}
 <p class="warn">Первые дни работы: цифры ещё ничего не доказывают. Оценивать бота можно только на десятках закрытых сделок.</p>
 <div class="tiles">
@@ -65,11 +75,12 @@ ${state}
 </div>
 <section><h2>Открытые сделки — режим «немного рискованный»</h2><p class="note">Режим сейчас: ${on(d.modes?.risk)}. Сделка ещё не закрыта: число справа — сколько было бы в плюсе или минусе, если закрыть прямо сейчас; оно меняется вместе с ценой. Стоп и тейк стоят на бирже.</p><div class="list">${openC}</div></section>
 <section><h2>Сбор финансирования — режим «безрисковый»</h2><p class="note">Режим сейчас: ${on(d.modes?.safe)}. Монета куплена на споте и столько же продано на фьючерсе: цена почти не влияет, доход — выплаты каждые 8 часов (03:00, 11:00, 19:00 МСК).</p><div class="list">${harvC}</div></section>
+${coinsSec(d)}
 <section><h2>Закрытые сделки</h2><div class="list">${closedC}</div></section>
 <details><summary>Как устроен бот</summary>
 <p>Безрисковый режим — сбор финансирования: позиция рыночно-нейтральна, доход приносят выплаты, когда лонги переплачивают шортам. Расходы на вход и выход обеих частей ≈ 0,31%, поэтому позиции держатся днями.</p>
 <p>Немного рискованный режим — сделки по правилам, которые сначала проверены на истории Bybit: подбор на одной части данных, проверка на другой. Основное правило — «перекос финансирования»: вход против переплачивающей стороны, удержание до суток.</p>
-<p>Общий баланс демо-счёта не показан: на нём лежат подаренные биржей монеты, и он колеблется с их ценой независимо от бота. Бот присылает свежие данные каждые 5 минут.</p>
+<p>Общий баланс демо-счёта не показан: на нём лежат подаренные биржей монеты, и он колеблется с их ценой независимо от бота. Бот присылает свежие данные каждую минуту.</p>
 </details>`;
 }
 let cur = JSON.parse(document.getElementById('initial').textContent);
@@ -85,7 +96,11 @@ async function pull() {
     } catch (e) {}
   }
 }
-pull(); setInterval(pull, 60000);
+async function live() {
+  const urls = ['https://api.bybit.com/v5/market/tickers?category=linear', 'https://api.bytick.com/v5/market/tickers?category=linear'];
+  for (const u of urls) { try { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) continue; const j = await r.json(); const L = {}; for (const x of j.result.list) L[x.symbol] = { p: +x.lastPrice, ps: x.lastPrice, ch: +x.price24hPcnt * 100 }; LIVE = L; liveAt = Date.now(); render(cur); return; } catch (e) {} }
+}
+pull(); live(); setInterval(pull, 60000); setInterval(live, 10000);
 setInterval(() => render(cur), 60000);
 </script>
 </body></html>
