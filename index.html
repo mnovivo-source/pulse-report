@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пульс — демо-торговля бота</title>
+<style>
+:root { color-scheme: light dark; --bg:#ffffff; --fg:#1a1a1a; --mut:#6b6b6b; --panel:#f6f6f4; --line:#e3e3df; --ok:#1a7f37; --bad:#c62828; --warn:#b26a00; }
+@media (prefers-color-scheme: dark) { :root { --bg:#111214; --fg:#ececec; --mut:#9a9a9a; --panel:#1b1c1f; --line:#2c2d31; --ok:#3fb950; --bad:#f85149; --warn:#d29922; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 16px 14px 40px; display:grid; gap:14px; }
+h1 { font: 400 26px/1.2 Georgia, "Times New Roman", serif; margin:0; }
+h2 { font-size:17px; font-weight:600; margin:0; }
+.lead, .note, .lbl, .empty, details { color:var(--mut); font-size:13px; }
+.lead { margin:6px 0 0; } .note { margin:4px 0 10px; } .empty { margin:0; }
+.warn { font-size:13px; color:var(--mut); border-left:3px solid var(--warn); padding-left:10px; margin:0; }
+.tiles { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
+@media (min-width:640px) { .tiles { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+.tile, section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+.big { font: 400 26px/1.15 Georgia, serif; margin:4px 0; font-variant-numeric: tabular-nums; }
+.list { display:grid; gap:8px; }
+.trade { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--bg); }
+.top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.name { font-weight:600; } .res { font: 18px Georgia, serif; white-space:nowrap; font-variant-numeric: tabular-nums; }
+dl { display:grid; grid-template-columns:auto 1fr; column-gap:14px; row-gap:2px; margin:6px 0 0; font-size:13px; font-variant-numeric: tabular-nums; }
+dt { color:var(--mut); } dd { margin:0; text-align:right; }
+.pos { color:var(--ok); } .neg { color:var(--bad); }
+</style></head><body><main>
+<header><h1>Пульс — демо-торговля бота</h1>
+<p class="lead">Демо-счёт Bybit, ненастоящие деньги. Время московское. Обновлено 06.11, 20:53, бот работает с 06.11, 15:34.</p></header>
+<p class="warn">Первые часы работы: цифры ещё ничего не доказывают. Оценивать бота можно только на десятках закрытых сделок.</p>
+<div class="tiles">
+<div class="tile"><div class="lbl">Сбор финансирования</div><div class="big pos">+1.38</div><div class="lbl">USDT итог</div></div>
+<div class="tile"><div class="lbl">Получено выплат</div><div class="big">0.110</div><div class="lbl">USDT</div></div>
+<div class="tile"><div class="lbl">Открыто сделок</div><div class="big">1</div><div class="lbl">сейчас <span class="neg">-2.86</span> USDT</div></div>
+<div class="tile"><div class="lbl">Закрыто сделок</div><div class="big">0</div><div class="lbl">итог <span class="">0.00</span> USDT, в плюс 0</div></div>
+</div>
+<section><h2>Открытые сделки</h2><p class="note">Рискованный режим: вкл. Стоп и тейк стоят на бирже. По времени и цене входа сделку можно найти на графике Bybit.</p><div class="list"><div class="trade"><div class="top"><span class="name">XLM · покупка</span><span class="res neg">-2.86 USDT</span></div><dl><dt>Вход</dt><dd>06.11, 20:00</dd><dt>Цена входа</dt><dd>0.1566</dd><dt>Объём</dt><dd>1598</dd><dt>Стоп</dt><dd>0.149</dd><dt>Тейк</dt><dd>0.1638</dd><dt>Правило</dt><dd>перекос финансирования</dd></dl></div></div></section>
+<section><h2>Сбор финансирования</h2><p class="note">Безрисковый режим: вкл. Монета куплена на споте и столько же продано на фьючерсе: цена почти не влияет, доход — выплаты каждые 8 часов.</p><div class="list"><div class="trade"><div class="top"><span class="name">HYPE · спот + шорт</span><span class="res neg">-0.01 USDT</span></div><dl><dt>Вход</dt><dd>06.11, 18:07</dd><dt>Объём</dt><dd>12.75</dd><dt>Цена спота</dt><dd>78.514</dd><dt>Цена шорта</dt><dd>78.418</dd><dt>Спот / шорт</dt><dd>-6.77 / +8.21</dd><dt>Выплаты</dt><dd>0.100</dd><dt>Комиссии</dt><dd>1.55</dd><dt>Держится</dt><dd>2.8 ч</dd></dl></div><div class="trade"><div class="top"><span class="name">NEAR · спот + шорт</span><span class="res pos">+1.39 USDT</span></div><dl><dt>Вход</dt><dd>06.11, 18:07</dd><dt>Объём</dt><dd>266.1</dd><dt>Цена спота</dt><dd>3.768</dd><dt>Цена шорта</dt><dd>3.763</dd><dt>Спот / шорт</dt><dd>-12.24 / +15.17</dd><dt>Выплаты</dt><dd>0.010</dd><dt>Комиссии</dt><dd>1.55</dd><dt>Держится</dt><dd>2.8 ч</dd></dl></div></div></section>
+<section><h2>Закрытые сделки</h2><div class="list"><p class="empty">Закрытых сделок пока нет: здесь появится каждая сделка со временем и ценой входа и выхода.</p></div></section>
+<details><summary>Как устроен бот</summary>
+<p>Безрисковый режим — сбор финансирования: позиция рыночно-нейтральна, доход приносят выплаты, когда лонги переплачивают шортам. Расходы на вход и выход обеих частей ≈ 0,31%, поэтому позиции держатся днями.</p>
+<p>Рискованный режим — сделки по правилам, которые сначала проверены на истории Bybit: подбор на одной части данных, проверка на другой. Основное правило — «перекос финансирования»: вход против переплачивающей стороны, удержание до суток.</p>
+<p>Общий баланс демо-счёта не показан: на нём лежат подаренные биржей монеты, и он колеблется с их ценой независимо от бота. Страница обновляется примерно раз в час.</p>
+</details>
+</main></body></html>
