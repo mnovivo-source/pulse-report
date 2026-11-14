@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Пульс — монета онлайн</title>
+<style>
+:root{--bg:#ffffff;--fg:#1a1a1a;--mut:#6b6b6b;--line:#e3e3df;--panel:#f6f6f4;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--okb:#bfe3c8;--badb:#f0c2c2}
+@media (prefers-color-scheme: dark){:root{--bg:#111214;--fg:#ececec;--mut:#9a9a9a;--line:#2c2d31;--panel:#1b1c1f;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--okb:#1f5a2c;--badb:#7a2a26}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:1280px;margin:0 auto;padding:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+h1{font-size:18px;margin:0 6px 0 0}
+h2{font-size:15px;margin:0}
+input,select,button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input{width:130px;text-transform:uppercase;font-weight:600}
+button{cursor:pointer}
+.mut{color:var(--mut)} .up{color:var(--ok)} .dn{color:var(--bad)} .warn{color:var(--warn)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.card.off{opacity:.55}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.top a{color:var(--mut);font-size:12px;white-space:nowrap}
+.px{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.chg{font-variant-numeric:tabular-nums;margin-bottom:8px}
+.row{display:grid;grid-template-columns:118px 1fr;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.row>div:first-child{color:var(--mut);font-size:13px}
+.bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--line)}
+.bar i{display:block;height:100%} .bar .b{background:var(--ok)} .bar .s{background:var(--bad)}
+.cap{display:flex;justify-content:space-between;font-size:12px;margin-top:2px}
+.sum{margin-bottom:12px}
+.sum .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:4px 24px}
+details{margin:0 0 12px} summary{cursor:pointer;color:var(--mut)}
+details p{margin:6px 0;color:var(--mut)}
+footer{margin-top:14px;color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Пульс · монета онлайн</h1>
+  <input id="coin" list="coins" placeholder="МОНЕТА" autocomplete="off" aria-label="Монета">
+  <datalist id="coins"></datalist>
+  <button id="go">Показать</button>
+  <label class="mut">Стакан рядом с ценой:
+    <select id="rng"><option value="0.5">±0,5 %</option><option value="1" selected>±1 %</option><option value="2">±2 %</option></select>
+  </label>
+  <span id="stamp" class="mut"></span>
+</header>
+<details>
+  <summary>Что здесь показано</summary>
+  <p><b>Стакан</b> — сколько денег стоит в заявках на покупку (зелёное) и на продажу (красное) рядом с ценой. Перевес показывает, с какой стороны «давят».</p>
+  <p><b>Лента</b> — кто активнее торгует по рынку за последнюю минуту и за 5 минут: покупатели (зелёное) или продавцы (красное).</p>
+  <p><b>Открытый интерес</b> — сумма всех открытых позиций на фьючерсе. Растёт вместе с ценой — в движение заходят новые деньги; падает — позиции закрывают.</p>
+  <p><b>Финансирование</b> — плата между лонгами и шортами. Плюс — платят лонги, минус — платят шорты.</p>
+  <p><b>Крупные заявки</b> — самая большая заявка с каждой стороны в пределах 2 % от цены.</p>
+  <p>Данные приходят в ваш браузер напрямую с бирж и обновляются каждые 2–3 секунды. Это наблюдение, а не совет.</p>
+</details>
+<section class="card sum" id="sum"></section>
+<section class="grid" id="cards"></section>
+<footer>Источник — открытые данные Bybit, Binance и Gate. Если площадка помечена «нет связи», биржа недоступна из вашей сети.</footer>
+</main>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const fn = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const fp = x => x > 0 ? String(+x.toPrecision(5)).replace('.', ',') : '—';
+const fu = x => !(x >= 0) ? '—' : x >= 1e9 ? fn(x / 1e9, 2) + ' млрд' : x >= 1e6 ? fn(x / 1e6) + ' млн' : x >= 1e3 ? Math.round(x / 1e3) + ' тыс.' : String(Math.round(x));
+const pc = (x, d = 1) => x == null || !isFinite(x) ? '—' : Math.abs(x) < 0.5 / 10 ** d ? fn(0, d) + ' %' : (x > 0 ? '+' : '−') + fn(Math.abs(x), d) + ' %';
+const flat = (x, d = 1) => x == null || !isFinite(x) || Math.abs(x) < 0.5 / 10 ** d;
+const chg = (x, d = 1) => `<span class="${flat(x, d) ? 'mut' : x > 0 ? 'up' : 'dn'}">${flat(x, d) ? '' : x > 0 ? '▲ ' : '▼ '}${pc(x, d)}</span>`;
+async function j(url, ms = 7000) { const r = await fetch(url, { signal: AbortSignal.timeout(ms) }); if (!r.ok) throw Error('HTTP ' + r.status); return r.json(); }
+const BYH = ['https://api.bybit.com', 'https://api.bytick.com']; let byI = 0;
+async function by(q) { try { const x = await j(BYH[byI] + q); if (x.retCode) throw Error(x.retMsg); return x.result; } catch (e) { byI = 1 - byI; throw e; } }
+const GT = 'https://api.gateio.ws/api/v4', BF = 'https://fapi.binance.com', BS = 'https://api.binance.com';
+function baseOf(sym) { let b = sym.replace(/_?USDT$/, ''), m; if ((m = b.match(/^(10{2,})([A-Z].*)$/))) return [m[2], +m[1]]; if ((m = b.match(/^([A-Z].*?)(10{3,})$/))) return [m[1], +m[2]]; return [b, 1]; }
+const lv = (a, k = 1) => a.map(l => [+l[0], +l[0] * +l[1] * k]);
+
+// Площадки: list — все пары (для подсказки и поиска нужной пары), poll — быстрые данные, slow — открытый интерес и финансирование
+const VEN = [
+  { k: 'byf', name: 'Bybit фьючерсы', fut: 1, every: 2000, url: s => `https://www.bybit.com/trade/usdt/${s}`,
+    list: async () => (await by('/v5/market/tickers?category=linear')).list.map(x => x.symbol).filter(s => /^[A-Z0-9]+USDT$/.test(s)),
+    poll: async s => { const [t, ob, tr] = await Promise.all([by(`/v5/market/tickers?category=linear&symbol=${s}`), by(`/v5/market/orderbook?category=linear&symbol=${s}&limit=200`), by(`/v5/market/recent-trade?category=linear&symbol=${s}&limit=1000`)]); const x = t.list[0];
+      return { last: +x.lastPrice, turn: +x.turnover24h, oi: +x.openInterestValue, oiN: +x.openInterest, fund: +x.fundingRate * 100, next: +x.nextFundingTime, bids: lv(ob.b), asks: lv(ob.a), trades: tr.list.map(q => ({ id: q.execId, t: +q.time, usd: +q.price * +q.size, buy: q.side === 'Buy', p: +q.price })) }; },
+    slow: async s => ({ oiHist: (await by(`/v5/market/open-interest?category=linear&symbol=${s}&intervalTime=5min&limit=14`)).list.map(x => [+x.timestamp, +x.openInterest]) }) },
+  { k: 'bnf', name: 'Binance фьючерсы', fut: 1, every: 3000, url: s => `https://www.binance.com/ru/futures/${s}`,
+    list: async () => (await j(BF + '/fapi/v1/ticker/price')).map(x => x.symbol).filter(s => /^[A-Z0-9]+USDT$/.test(s)),
+    poll: async s => { const [t, ob, tr] = await Promise.all([j(`${BF}/fapi/v1/ticker/24hr?symbol=${s}`), j(`${BF}/fapi/v1/depth?symbol=${s}&limit=500`), j(`${BF}/fapi/v1/aggTrades?symbol=${s}&limit=1000`)]);
+      return { last: +t.lastPrice, turn: +t.quoteVolume, bids: lv(ob.bids), asks: lv(ob.asks), trades: tr.map(q => ({ id: q.a, t: q.T, usd: +q.p * +q.q, buy: !q.m, p: +q.p })) }; },
+    slow: async s => { const [o, p, h] = await Promise.all([j(`${BF}/fapi/v1/openInterest?symbol=${s}`), j(`${BF}/fapi/v1/premiumIndex?symbol=${s}`), j(`${BF}/futures/data/openInterestHist?symbol=${s}&period=5m&limit=14`).catch(() => [])]);
+      return { oiN: +o.openInterest, oiPx: +p.markPrice, fund: +p.lastFundingRate * 100, next: +p.nextFundingTime, oiHist: h.map(x => [+x.timestamp, +x.sumOpenInterest]) }; } },
+  { k: 'gtf', name: 'Gate фьючерсы', fut: 1, every: 3000, url: s => `https://www.gate.com/ru/futures/USDT/${s}`,
+    list: async () => (await j(GT + '/futures/usdt/tickers', 15000)).map(x => x.contract).filter(s => /^[A-Z0-9]+_USDT$/.test(s)),
+    poll: async (s, st) => { if (!st.mult2) { const c = await j(`${GT}/futures/usdt/contracts/${s}`); st.mult2 = +c.quanto_multiplier || 1; st.next = +c.funding_next_apply * 1000; }
+      const [t, ob, tr] = await Promise.all([j(`${GT}/futures/usdt/tickers?contract=${s}`), j(`${GT}/futures/usdt/order_book?contract=${s}&limit=100`), j(`${GT}/futures/usdt/trades?contract=${s}&limit=1000`)]); const x = t[0], k = st.mult2;
+      return { last: +x.last, turn: +x.volume_24h_quote, oi: +x.total_size * k * +x.mark_price, oiN: +x.total_size, fund: +x.funding_rate * 100, next: st.next, bids: ob.bids.map(l => [+l.p, +l.p * +l.s * k]), asks: ob.asks.map(l => [+l.p, +l.p * +l.s * k]),
+        trades: tr.map(q => ({ id: q.id, t: (+q.create_time_ms || +q.create_time) * 1000, usd: Math.abs(+q.size) * k * +q.price, buy: +q.size > 0, p: +q.price })) }; },
+    slow: async (s, st) => { const [h, c] = await Promise.all([j(`${GT}/futures/usdt/contract_stats?contract=${s}&interval=5m&limit=14`).catch(() => []), j(`${GT}/futures/usdt/contracts/${s}`)]); st.next = +c.funding_next_apply * 1000; return { oiHist: h.map(x => [+x.time * 1000, +x.open_interest]) }; } },
+  { k: 'bys', name: 'Bybit спот', every: 3000, url: (s, b) => `https://www.bybit.com/ru-RU/trade/spot/${b}/USDT`,
+    list: async () => (await by('/v5/market/tickers?category=spot')).list.map(x => x.symbol).filter(s => /^[A-Z0-9]+USDT$/.test(s)),
+    poll: async s => { const [t, ob, tr] = await Promise.all([by(`/v5/market/tickers?category=spot&symbol=${s}`), by(`/v5/market/orderbook?category=spot&symbol=${s}&limit=200`), by(`/v5/market/recent-trade?category=spot&symbol=${s}&limit=60`)]); const x = t.list[0];
+      return { last: +x.lastPrice, turn: +x.turnover24h, bids: lv(ob.b), asks: lv(ob.a), trades: tr.list.map(q => ({ id: q.execId, t: +q.time, usd: +q.price * +q.size, buy: q.side === 'Buy', p: +q.price })) }; } },
+  { k: 'bns', name: 'Binance спот', every: 3000, url: s => `https://www.binance.com/ru/trade/${s.replace(/USDT$/, '')}_USDT`,
+    list: async () => (await j(BS + '/api/v3/ticker/price')).map(x => x.symbol).filter(s => /^[A-Z0-9]+USDT$/.test(s)),
+    poll: async s => { const [t, ob, tr] = await Promise.all([j(`${BS}/api/v3/ticker/24hr?symbol=${s}`), j(`${BS}/api/v3/depth?symbol=${s}&limit=500`), j(`${BS}/api/v3/aggTrades?symbol=${s}&limit=1000`)]);
+      return { last: +t.lastPrice, turn: +t.quoteVolume, bids: lv(ob.bids), asks: lv(ob.asks), trades: tr.map(q => ({ id: q.a, t: q.T, usd: +q.p * +q.q, buy: !q.m, p: +q.p })) }; } },
+  { k: 'gts', name: 'Gate спот', every: 3000, url: s => `https://www.gate.com/ru/trade/${s}`,
+    list: async () => (await j(GT + '/spot/tickers', 15000)).map(x => x.currency_pair).filter(s => /^[A-Z0-9]+_USDT$/.test(s) && !/\d[LS]_USDT$/.test(s)),
+    poll: async s => { const [t, ob, tr] = await Promise.all([j(`${GT}/spot/tickers?currency_pair=${s}`), j(`${GT}/spot/order_book?currency_pair=${s}&limit=100`), j(`${GT}/spot/trades?currency_pair=${s}&limit=1000`)]); const x = t[0];
+      return { last: +x.last, turn: +x.quote_volume, bids: lv(ob.bids), asks: lv(ob.asks), trades: tr.map(q => ({ id: q.id, t: +q.create_time_ms, usd: +q.amount * +q.price, buy: q.side === 'buy', p: +q.price })) }; } },
+];
+const MAPS = {}; // площадка → Map(монета → { sym, mult })
+let run = 0, coin = '', ST = {}, lastOk = 0;
+
+async function loadLists() {
+  await Promise.all(VEN.map(async v => { try { const m = new Map(); for (const s of await v.list()) { const [b, mult] = baseOf(s); if (!m.has(b) || mult === 1) m.set(b, { sym: s, mult }); } MAPS[v.k] = m; } catch { MAPS[v.k] = null; } }));
+  const all = new Set(); for (const v of VEN) if (MAPS[v.k]) for (const b of MAPS[v.k].keys()) all.add(b);
+  $('#coins').innerHTML = [...all].sort().map(b => `<option value="${b}">`).join('');
+}
+function start(c) {
+  coin = c.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, '') || 'BTC'; $('#coin').value = coin; document.title = coin + ' онлайн — Пульс';
+  history.replaceState(null, '', '?c=' + encodeURIComponent(coin)); const id = ++run; ST = {};
+  $('#cards').innerHTML = VEN.map(v => `<article class="card" id="c-${v.k}"></article>`).join('');
+  for (const v of VEN) {
+    const m = MAPS[v.k], f = m && m.get(coin), st = ST[v.k] = { v, sym: f ? f.sym : '', mult: f ? f.mult : 1, tr: new Map(), smp: [], d: null, s: null, err: m ? (f ? '' : 'нет такой пары') : 'нет связи с биржей', okAt: 0 };
+    draw(st); if (!f) continue;
+    const fast = async () => { if (id !== run) return; if (!document.hidden) { try { merge(st, await v.poll(st.sym, st)); st.err = ''; st.okAt = lastOk = Date.now(); } catch (e) { if (Date.now() - st.okAt > 15000) st.err = 'нет связи с биржей'; } draw(st); drawSum(); } setTimeout(fast, v.every); };
+    const slow = async () => { if (id !== run) return; if (v.slow && !document.hidden) { try { st.s = await v.slow(st.sym, st); } catch { /* останутся прежние */ } } setTimeout(slow, 20000); };
+    fast(); slow();
+  }
+  drawSum();
+}
+function merge(st, d) {
+  const now = Date.now(); st.d = d;
+  for (const q of d.trades) if (q.t > now - 11 * 60e3) st.tr.set(q.id, q);
+  if (st.tr.size > 6000 || now - (st.gc || 0) > 60e3) { st.gc = now; for (const [id, q] of st.tr) if (q.t < now - 11 * 60e3) st.tr.delete(id); }
+  d.all = d.trades.slice().sort((a, b) => a.t - b.t);
+  const bb = d.bids[0]?.[0], ba = d.asks[0]?.[0]; d.mid = bb > 0 && ba >= bb ? (bb + ba) / 2 : d.last;
+  st.smp.push([now, d.mid]); while (st.smp.length && st.smp[0][0] < now - 7 * 60e3) st.smp.shift();
+}
+function pxAgo(st, ms) { // цена ms назад: из собственных замеров, а пока их мало — из ленты сделок
+  const T = Date.now() - ms; let p = null;
+  for (const [t, x] of st.smp) { if (t <= T) p = x; else break; }
+  if (p === null) { const a = st.d.all; if (a.length && a[0].t <= T) for (const q of a) { if (q.t <= T) p = q.p; else break; } }
+  return p;
+}
+function tape(st, ms) { const T = Date.now() - ms; let b = 0, s = 0; for (const q of st.tr.values()) if (q.t >= T) { if (q.buy) b += q.usd; else s += q.usd; } return [b, s]; }
+function book(d, r) { // деньги в заявках в пределах r % от цены; если стакан отдан не на всю глубину — сравниваем на одинаковом расстоянии
+  const m = d.mid; if (!(m > 0) || !d.bids.length || !d.asks.length) return null;
+  const cb = d.bids.length < 95 ? 99 : (m - d.bids[d.bids.length - 1][0]) / m * 100, ca = d.asks.length < 95 ? 99 : (d.asks[d.asks.length - 1][0] - m) / m * 100; // меньше 95 уровней — сторона отдана целиком
+  const rr = Math.min(r, Math.max(0.01, Math.min(cb, ca)));
+  let b = 0, a = 0; for (const [p, u] of d.bids) if (p >= m * (1 - rr / 100)) b += u; for (const [p, u] of d.asks) if (p <= m * (1 + rr / 100)) a += u;
+  const top = (l, sgn) => { let t = null; for (const [p, u] of l) if (Math.abs(p - m) / m <= 0.02 && (!t || u > t[1])) t = [p, u]; return t && { p: t[0], u: t[1], dist: (t[0] / m - 1) * 100 }; };
+  return { b, a, r: rr, cut: rr < r - 1e-9, wb: top(d.bids), wa: top(d.asks) };
+}
+const bar = (b, s, lb, ls) => { const t = b + s, w = t > 0 ? b / t * 100 : 50; return `<div><div class="bar" role="img" aria-label="покупка ${Math.round(w)} %, продажа ${Math.round(100 - w)} %"><i class="b" style="width:${w}%"></i><i class="s" style="width:${100 - w}%"></i></div><div class="cap"><span class="up">${lb || 'покупка'} ${t > 0 ? Math.round(w) + ' %' : '—'} · ${fu(b)}</span><span class="dn">${fu(s)} · ${t > 0 ? Math.round(100 - w) + ' %' : '—'} ${ls || 'продажа'}</span></div></div>`; };
+const histAt = (h, ms) => { const T = Date.now() - ms; let v = null, bt = 0; for (const [t, x] of h || []) if (t <= T && t > bt) { bt = t; v = x; } return v; };
+const left = t => { const m = Math.round((t - Date.now()) / 60e3); return !(t > 0) || m < 0 ? '' : m >= 60 ? `через ${Math.floor(m / 60)} ч ${m % 60} мин` : `через ${m} мин`; };
+function oiOf(st) { const d = st.d, s = st.s || {}; const n = d.oiN ?? s.oiN, usd = d.oi ?? (s.oiN > 0 ? s.oiN * d.mid : null); const h5 = histAt(s.oiHist, 5 * 60e3), h60 = histAt(s.oiHist, 60 * 60e3); return { usd, c5: n > 0 && h5 > 0 ? (n / h5 - 1) * 100 : null, c60: n > 0 && h60 > 0 ? (n / h60 - 1) * 100 : null, fund: d.fund ?? s.fund, next: d.next ?? s.next }; }
+function med() { const a = Object.values(ST).filter(s => s.d && s.d.mid > 0 && !s.err).map(s => s.d.mid / s.mult).sort((x, y) => x - y); return a.length ? (a.length % 2 ? a[a.length >> 1] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2) : 0; }
+function draw(st) {
+  const el = $('#c-' + st.v.k); if (!el) return; const v = st.v, d = st.d;
+  const head = `<div class="top"><h2>${v.name}</h2>${st.sym ? `<a href="${v.url(st.sym, coin)}" target="_blank" rel="noopener">${st.sym.replace('_', '')} — открыть на бирже ↗</a>` : ''}</div>`;
+  if (!d || st.err) { el.className = 'card off'; el.innerHTML = head + `<p class="mut">${st.err || 'загружаю…'}</p>`; return; }
+  el.className = 'card'; const r = +$('#rng').value, bk = book(d, r), p1 = pxAgo(st, 60e3), p5 = pxAgo(st, 300e3), t1 = tape(st, 60e3), t5 = tape(st, 300e3), m = med(), dev = m > 0 ? (d.mid / st.mult / m - 1) * 100 : null;
+  let h = head + `<div class="px">${fp(d.mid)}</div><div class="chg">${chg(p1 ? (d.mid / p1 - 1) * 100 : null, 2)} <span class="mut">за 1 мин</span> · ${chg(p5 ? (d.mid / p5 - 1) * 100 : null, 2)} <span class="mut">за 5 мин</span></div>`;
+  h += `<div class="row"><div>К другим биржам</div><div>${chg(dev, 2)} <span class="mut">от средней цены · оборот за сутки ${fu(d.turn)}</span></div></div>`;
+  h += `<div class="row"><div>Стакан ±${fn(bk ? bk.r : r, bk && bk.r < 0.1 ? 2 : 1)} %${bk && bk.cut ? ' <span class="warn" title="Биржа отдаёт стакан не на всю глубину — сравнение на меньшем расстоянии">*</span>' : ''}</div>${bk ? bar(bk.b, bk.a) : '<div class="mut">—</div>'}</div>`;
+  h += `<div class="row"><div>Лента 1 мин</div>${bar(t1[0], t1[1], 'купили', 'продали')}</div><div class="row"><div>Лента 5 мин</div>${bar(t5[0], t5[1], 'купили', 'продали')}</div>`;
+  if (v.fut) { const o = oiOf(st); h += `<div class="row"><div>Открытый интерес</div><div>${o.usd > 0 ? fu(o.usd) + ' USDT' : '—'} <span class="mut">· 5 мин</span> ${chg(o.c5, 2)} <span class="mut">· 1 ч</span> ${chg(o.c60, 1)}</div></div><div class="row"><div>Финансирование</div><div>${o.fund == null ? '—' : chg(o.fund, 4)} <span class="mut">${o.fund > 0 ? 'платят лонги' : o.fund < 0 ? 'платят шорты' : ''}${left(o.next) ? ' · ' + left(o.next) : ''}</span></div></div>`; }
+  if (bk) h += `<div class="row"><div>Крупные заявки</div><div>${bk.wb ? `<span class="up">покупка ${fu(bk.wb.u)} USDT</span> по ${fp(bk.wb.p)} <span class="mut">(${pc(bk.wb.dist, 2)})</span>` : '—'}<br>${bk.wa ? `<span class="dn">продажа ${fu(bk.wa.u)} USDT</span> по ${fp(bk.wa.p)} <span class="mut">(${pc(bk.wa.dist, 2)})</span>` : '—'}</div></div>`;
+  el.innerHTML = h;
+}
+function drawSum() {
+  const live = Object.values(ST).filter(s => s.d && !s.err), r = +$('#rng').value; let b = 0, a = 0, t1 = [0, 0], t5 = [0, 0], oi = 0, lo = null, hi = null;
+  for (const s of live) { const bk = book(s.d, r); if (bk) { b += bk.b; a += bk.a; } const x = tape(s, 60e3), y = tape(s, 300e3); t1[0] += x[0]; t1[1] += x[1]; t5[0] += y[0]; t5[1] += y[1]; if (s.v.fut) oi += oiOf(s).usd || 0; const p = s.d.mid / s.mult; if (p > 0) { if (!lo || p < lo.p) lo = { p, s }; if (!hi || p > hi.p) hi = { p, s }; } }
+  const spread = lo && hi && lo.s !== hi.s ? (hi.p / lo.p - 1) * 100 : null;
+  $('#sum').innerHTML = `<div class="top"><h2>${coin} — все площадки вместе</h2><span class="mut">${live.length} из ${VEN.length} на связи</span></div>` + (live.length ? `<div class="grid2">
+    <div class="row"><div>Стакан ±${fn(r)} %</div>${bar(b, a)}</div><div class="row"><div>Лента 1 мин</div>${bar(t1[0], t1[1], 'купили', 'продали')}</div>
+    <div class="row"><div>Лента 5 мин</div>${bar(t5[0], t5[1], 'купили', 'продали')}</div><div class="row"><div>Открытый интерес</div><div>${oi > 0 ? fu(oi) + ' USDT <span class="mut">на трёх фьючерсах</span>' : '—'}</div></div>
+    <div class="row"><div>Разброс цен</div><div>${spread == null ? '—' : `<b>${fn(spread, 2)} %</b> <span class="mut">дороже всего — ${hi.s.v.name}, дешевле — ${lo.s.v.name}</span>`}</div></div></div>` : '<p class="mut">Нет данных: проверьте название монеты или связь с биржами.</p>');
+  $('#stamp').textContent = lastOk ? 'обновлено ' + new Date(lastOk).toLocaleTimeString('ru-RU') : '';
+}
+$('#go').onclick = () => start($('#coin').value); $('#coin').onchange = () => start($('#coin').value);
+$('#coin').onkeydown = e => { if (e.key === 'Enter') start($('#coin').value); };
+$('#rng').onchange = () => { for (const s of Object.values(ST)) draw(s); drawSum(); };
+(async () => { const c = new URLSearchParams(location.search).get('c') || 'BTC'; $('#coin').value = c.toUpperCase(); $('#sum').innerHTML = '<p class="mut">Загружаю списки монет с бирж…</p>'; await loadLists(); start(c); })();
+</script>
+</body>
+</html>
