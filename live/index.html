@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex">
 <title>Пульс — монеты онлайн</title>
 <style>
-:root{--bg:#ffffff;--fg:#1a1a1a;--mut:#6b6b6b;--line:#e3e3df;--panel:#f6f6f4;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--acc:#2f6fde;--hov:#ecece8;--grid:rgba(0,0,0,.13);--zeb:rgba(0,0,0,.035)}
-@media (prefers-color-scheme: dark){:root{--bg:#111214;--fg:#ececec;--mut:#9a9a9a;--line:#2c2d31;--panel:#1b1c1f;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--acc:#6ea8fe;--hov:#25262a;--grid:rgba(255,255,255,.13);--zeb:rgba(255,255,255,.035)}}
+:root{--bg:#ffffff;--fg:#1a1a1a;--mut:#6b6b6b;--line:#e3e3df;--panel:#f6f6f4;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--acc:#2f6fde;--hov:#ecece8;--grid:rgba(0,0,0,.13);--zeb:rgba(0,0,0,.035);--selc:rgba(47,111,222,.14)}
+@media (prefers-color-scheme: dark){:root{--bg:#111214;--fg:#ececec;--mut:#9a9a9a;--line:#2c2d31;--panel:#1b1c1f;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--acc:#6ea8fe;--hov:#25262a;--grid:rgba(255,255,255,.13);--zeb:rgba(255,255,255,.035);--selc:rgba(110,168,254,.20)}}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:13.5px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
@@ -43,6 +43,10 @@ td a{color:inherit;text-decoration:none}
 details{margin-top:8px} summary{cursor:pointer;color:var(--mut)} details p{margin:5px 0;color:var(--mut)}
 footer{margin-top:6px;color:var(--mut);font-size:12px}
 .fv{margin:0 8px 0 0;vertical-align:-2px;cursor:pointer;width:15px;height:15px;accent-color:var(--acc)}
+#pk{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--bg);border:2px solid var(--acc);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+#pkok{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:650;min-width:84px}
+#lt tbody tr.sel td{background-image:linear-gradient(var(--selc),var(--selc))}
+@media (pointer:coarse),(max-width:900px){.fv{width:22px;height:22px;margin-right:10px;vertical-align:-5px} button,select,input:not(.fv){padding:9px 12px} #lt td{padding-top:10px;padding-bottom:10px}}
 #mine.on{border-color:var(--acc);color:var(--acc);font-weight:650}
 [hidden]{display:none!important}
 @media (max-width:900px){body{font-size:13px} main{height:auto;display:block} .tiles{grid-template-columns:repeat(2,minmax(0,1fr))} .tw{max-height:none}}
@@ -63,10 +67,12 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
     <select id="fv" aria-label="Биржа"><option value="">Все биржи</option><option value="byf">Есть на Bybit</option><option value="bnf">Есть на Binance</option><option value="gtf">Есть на Gate</option></select>
     <select id="ft" aria-label="Оборот"><option value="0">Любой оборот</option><option value="1e6" selected>Оборот от 1 млн</option><option value="1e7">Оборот от 10 млн</option><option value="1e8">Оборот от 100 млн</option></select>
     <select id="fb" aria-label="Стакан"><option value="">Любой стакан</option><option value="buy">Перевес покупателей (от 60 %)</option><option value="sell">Перевес продавцов (от 60 %)</option></select>
+    <button id="pick" title="Отметить монеты, которые вам интересны">☑ Выбрать монеты</button>
     <button id="mine" title="Показывать только монеты, отмеченные галочкой">☐ Только мои</button>
     <button id="clr" class="sm" hidden>Снять все галочки</button>
     <span id="cnt" class="mut sm"></span>
   </div>
+  <div id="pk" hidden><span>Нажимайте на нужные монеты. Отмечено: <b id="pkn">0</b></span><button id="pkok">ОК</button><button id="pkno">Отмена</button><button id="pkclr" class="sm">Снять все</button></div>
   <div class="tw"><table id="lt"><thead><tr id="lh"></tr></thead><tbody id="lb"><tr><td class="mut">Загружаю монеты с бирж…</td></tr></tbody></table></div>
 </section>
 
@@ -96,8 +102,8 @@ const flat = (x, d = 1) => x == null || !isFinite(x) || Math.abs(x) < 0.5 / 10 *
 const chg = (x, d = 1) => `<span class="${flat(x, d) ? 'mut' : x > 0 ? 'up' : 'dn'}">${flat(x, d) ? '' : x > 0 ? '▲ ' : '▼ '}${pc(x, d)}</span>`;
 async function j(url, ms = 9000) { const r = await fetch(url, { signal: AbortSignal.timeout(ms) }); if (!r.ok) throw Error('HTTP ' + r.status); return r.json(); }
 const BYH = ['https://api.bybit.com', 'https://api.bytick.com']; let byI = 0;
-const pick = Promise.any(BYH.map((h, i) => j(h + '/v5/market/time', 6000).then(() => i))).then(i => { byI = i; }).catch(() => { }); // какой из двух адресов Bybit доступен из этой сети
-async function by(q, ms) { await pick; try { const x = await j(BYH[byI] + q, ms); if (x.retCode) throw Error(x.retMsg); return x.result; } catch (e) { byI = 1 - byI; throw e; } }
+const byPick = Promise.any(BYH.map((h, i) => j(h + '/v5/market/time', 6000).then(() => i))).then(i => { byI = i; }).catch(() => { }); // какой из двух адресов Bybit доступен из этой сети
+async function by(q, ms) { await byPick; try { const x = await j(BYH[byI] + q, ms); if (x.retCode) throw Error(x.retMsg); return x.result; } catch (e) { byI = 1 - byI; throw e; } }
 const GT = 'https://api.gateio.ws/api/v4', BF = 'https://fapi.binance.com', BS = 'https://api.binance.com';
 function baseOf(sym) { let b = sym.replace(/_?USDT$/, ''), m; if ((m = b.match(/^(10{2,})([A-Z].*)$/))) return [m[2], +m[1]]; if ((m = b.match(/^([A-Z].*?)(10{3,})$/))) return [m[1], +m[2]]; return [b, 1]; }
 const lv = (a, k = 1) => a.map(l => [+l[0], +l[0] * +l[1] * k]);
@@ -175,24 +181,35 @@ const COLS = [
 let sort = { k: 'turn', d: -1 }, fav = new Set(), mine = false; // fav — монеты, отмеченные галочкой; mine — показывать только их
 try { fav = new Set(JSON.parse(localStorage.getItem('plfav') || '[]')); mine = localStorage.getItem('plmine') === '1'; } catch { /* хранилище недоступно — выбор живёт до закрытия вкладки */ }
 const saveFav = () => { try { localStorage.setItem('plfav', JSON.stringify([...fav])); localStorage.setItem('plmine', mine ? '1' : '0'); } catch { /* не страшно */ } };
-const favBox = b => `<input type="checkbox" class="fv" data-f="${b}"${fav.has(b) ? ' checked' : ''} title="Отметить монету — потом можно показать только отмеченные" aria-label="Отметить ${b}">`;
+let pick = false, tmp = new Set(), touching = false; // pick — идёт выбор монет (до «ОК» отметки лежат в tmp); touching — палец на экране, таблицу не перерисовываем
+const favBox = b => `<input type="checkbox" class="fv" data-f="${b}"${(pick ? tmp : fav).has(b) ? ' checked' : ''} title="Отметить монету — потом можно показать только отмеченные" aria-label="Отметить ${b}">`;
 try { const s = JSON.parse(sessionStorage.getItem('pl') || 'null'); if (s) { sort = s.sort; $('#fv').value = s.fv; $('#ft').value = s.ft; $('#fb').value = s.fb; } } catch { /* по умолчанию */ }
 function drawHead() { $('#lh').innerHTML = COLS.map(c => `<th class="s${sort.k === c.k ? ' on' : ''}" data-k="${c.k}"${c.tip ? ` title="${c.tip}"` : ''}>${c.t}${sort.k === c.k ? (sort.d > 0 ? ' ▲' : ' ▼') : ''}</th>`).join(''); }
 function drawList() {
   if (view !== 'list') return;
   const q = $('#q').value.trim().toUpperCase(), fv = $('#fv').value, ft = +$('#ft').value, fb = $('#fb').value; let rows = [], total = 0;
-  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (mine) { if (!fav.has(c.base)) continue; } else { if (fv && !(c.v[fv]?.px > 0)) continue; if (r.turn < ft) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; } rows.push(r); }
+  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (pick ? tmp.has(c.base) : mine) { if (!pick && !fav.has(c.base)) continue; } else { if (fv && !(c.v[fv]?.px > 0)) continue; if (r.turn < ft) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; } rows.push(r); }
   const col = COLS.find(c => c.k === sort.k), k = sort.k, d = sort.d;
-  rows.sort((a, b) => col.txt ? d * a[k].localeCompare(b[k]) : (a[k] == null) - (b[k] == null) || d * (a[k] - b[k]) || b.turn - a.turn);
-  $('#lb').innerHTML = rows.length ? rows.map(r => `<tr data-c="${r.base}">${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${COLS.length}" class="mut">${total ? (mine && !fav.size ? 'Вы ещё не отметили ни одной монеты. Нажмите «Только мои» ещё раз, чтобы увидеть все монеты, и поставьте галочки у нужных.' : mine ? 'Среди отмеченных монет такой нет.' : 'Под фильтры ничего не подходит.') + (q && /^[A-Z0-9]{2,}$/.test(q) ? ` <a href="?c=${q}" style="text-decoration:underline">Открыть ${q}</a>` : '') : 'Загружаю монеты с бирж…'}</td></tr>`;
-  $('#mine').textContent = (mine ? '☑' : '☐') + ' Только мои' + (fav.size ? ` (${fav.size})` : ''); $('#mine').className = mine ? 'on' : ''; $('#clr').hidden = !(mine && fav.size); for (const id of ['#fv', '#ft', '#fb']) $(id).disabled = mine;
+  rows.sort((a, b) => (pick ? tmp.has(b.base) - tmp.has(a.base) : 0) || (col.txt ? d * a[k].localeCompare(b[k]) : (a[k] == null) - (b[k] == null) || d * (a[k] - b[k]) || b.turn - a.turn));
+  $('#lb').innerHTML = rows.length ? rows.map(r => `<tr data-c="${r.base}"${pick && tmp.has(r.base) ? ' class="sel"' : ''}>${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${COLS.length}" class="mut">${total ? (!pick && mine && !fav.size ? 'Вы ещё не отметили ни одной монеты. Нажмите «Выбрать монеты» и отметьте нужные.' : !pick && mine ? 'Среди отмеченных монет такой нет.' : 'Под фильтры ничего не подходит.') + (q && /^[A-Z0-9]{2,}$/.test(q) ? ` <a href="?c=${q}" style="text-decoration:underline">Открыть ${q}</a>` : '') : 'Загружаю монеты с бирж…'}</td></tr>`;
+  $('#mine').textContent = (mine ? '☑' : '☐') + ' Только мои' + (fav.size ? ` (${fav.size})` : ''); $('#mine').className = mine ? 'on' : ''; $('#clr').hidden = pick || !(mine && fav.size); for (const id of ['#fv', '#ft', '#fb']) $(id).disabled = mine && !pick;
+  $('#pk').hidden = !pick; $('#pick').hidden = $('#mine').hidden = pick; $('#pkn').textContent = tmp.size;
   $('#cnt').textContent = total ? `показано ${rows.length} из ${total}` : ''; $('#stamp').textContent = bulkOk ? 'обновлено ' + new Date(bulkOk).toLocaleTimeString('ru-RU') : '';
   sessionStorage.setItem('pl', JSON.stringify({ sort, fv, ft: $('#ft').value, fb }));
 }
 $('#lh').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; sort = sort.k === k ? { k, d: -sort.d } : { k, d: COLS.find(c => c.k === k).txt ? 1 : -1 }; drawHead(); drawList(); };
 const favClick = e => { const f = e.target.closest('input[data-f]'); if (!f) return false; if (f.checked) fav.add(f.dataset.f); else fav.delete(f.dataset.f); saveFav(); return true; };
 $('#mine').onclick = () => { mine = !mine; saveFav(); drawList(); }; $('#clr').onclick = () => { fav.clear(); saveFav(); drawList(); };
-$('#lb').onclick = e => { if (favClick(e)) { drawList(); return; } const tr = e.target.closest('tr[data-c]'), a = e.target.closest('a[href^="?c="]'); const c = tr ? tr.dataset.c : a ? a.getAttribute('href').slice(3) : ''; if (c) { e.preventDefault(); go(c, true); } };
+$('#pick').onclick = () => { pick = true; tmp = new Set(fav); drawList(); $('#pk').scrollIntoView({ block: 'nearest' }); };
+$('#pkok').onclick = () => { fav = tmp; tmp = new Set(); mine = fav.size > 0; pick = false; saveFav(); drawList(); };
+$('#pkno').onclick = () => { pick = false; tmp = new Set(); drawList(); }; $('#pkclr').onclick = () => { tmp.clear(); drawList(); };
+addEventListener('touchstart', () => { touching = true; }, { passive: true }); for (const ev of ['touchend', 'touchcancel']) addEventListener(ev, () => setTimeout(() => { touching = false; }, 500), { passive: true });
+$('#lb').onclick = e => {
+  if (pick) { // идёт выбор: нажатие в любом месте строки ставит или снимает галочку, монета не открывается
+    const row = e.target.closest('tr[data-c]'); if (!row) return; const b = row.dataset.c, box = row.querySelector('input[data-f]'), on = e.target === box ? box.checked : !tmp.has(b);
+    if (e.target !== box) e.preventDefault(); if (on) tmp.add(b); else tmp.delete(b); if (box) box.checked = on; row.classList.toggle('sel', on); $('#pkn').textContent = tmp.size; return;
+  }
+  if (favClick(e)) { drawList(); return; } const tr = e.target.closest('tr[data-c]'), a = e.target.closest('a[href^="?c="]'); const c = tr ? tr.dataset.c : a ? a.getAttribute('href').slice(3) : ''; if (c) { e.preventDefault(); go(c, true); } };
 for (const id of ['#q', '#fv', '#ft', '#fb']) $(id).oninput = drawList;
 
 // ===================== СТРАНИЦА МОНЕТЫ: подробные данные по каждой площадке =====================
@@ -288,7 +305,7 @@ function go(c, push) { c = (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').rep
 $('#dh').onclick = e => { favClick(e); };
 $('#back').onclick = () => go('', true); $('#home').onclick = e => { e.preventDefault(); go('', true); };
 $('#rng').onchange = drawCoin; window.onpopstate = () => go(new URLSearchParams(location.search).get('c') || '');
-let tickN = 0; setInterval(() => { tickN++; if (view === 'coin') { if (dirty || tickN % 5 === 0) drawCoin(); } else if (!document.hidden && tickN % 2 === 0) drawList(); }, 1000);
+let tickN = 0; setInterval(() => { tickN++; if (view === 'coin') { if (dirty || tickN % 5 === 0) drawCoin(); } else if (!document.hidden && tickN % 2 === 0 && !pick && !touching) drawList(); }, 1000); // во время выбора и касания таблицу не трогаем — иначе нажатие может пропасть
 (async () => { const c = new URLSearchParams(location.search).get('c') || ''; drawHead(); if (c) { $('#list').style.display = 'none'; $('#detail').hidden = false; $('#dh').innerHTML = `<span class="nm">${c.toUpperCase()}</span><span class="mut">загружаю…</span>`; } await ready; go(c); loadTypes(); scanBooks(); })();
 </script>
 </body>
