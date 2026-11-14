@@ -42,6 +42,8 @@ td a{color:inherit;text-decoration:none}
 #dt .off td{opacity:.5}
 details{margin-top:8px} summary{cursor:pointer;color:var(--mut)} details p{margin:5px 0;color:var(--mut)}
 footer{margin-top:6px;color:var(--mut);font-size:12px}
+.fv{margin:0 8px 0 0;vertical-align:-2px;cursor:pointer;width:15px;height:15px;accent-color:var(--acc)}
+#mine.on{border-color:var(--acc);color:var(--acc);font-weight:650}
 [hidden]{display:none!important}
 @media (max-width:900px){body{font-size:13px} main{height:auto;display:block} .tiles{grid-template-columns:repeat(2,minmax(0,1fr))} .tw{max-height:none}}
 </style>
@@ -61,6 +63,8 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
     <select id="fv" aria-label="Биржа"><option value="">Все биржи</option><option value="byf">Есть на Bybit</option><option value="bnf">Есть на Binance</option><option value="gtf">Есть на Gate</option></select>
     <select id="ft" aria-label="Оборот"><option value="0">Любой оборот</option><option value="1e6" selected>Оборот от 1 млн</option><option value="1e7">Оборот от 10 млн</option><option value="1e8">Оборот от 100 млн</option></select>
     <select id="fb" aria-label="Стакан"><option value="">Любой стакан</option><option value="buy">Перевес покупателей (от 60 %)</option><option value="sell">Перевес продавцов (от 60 %)</option></select>
+    <button id="mine" title="Показывать только монеты, отмеченные галочкой">☐ Только мои</button>
+    <button id="clr" class="sm" hidden>Снять все галочки</button>
     <span id="cnt" class="mut sm"></span>
   </div>
   <div class="tw"><table id="lt"><thead><tr id="lh"></tr></thead><tbody id="lb"><tr><td class="mut">Загружаю монеты с бирж…</td></tr></tbody></table></div>
@@ -157,7 +161,7 @@ function rowOf(c) {
 }
 const mini = (c) => { const k = c.bk, w = k.p; return `<span class="mini" title="покупка ${fu(k.b)} USDT · продажа ${fu(k.a)} USDT · в пределах ±${fn(k.r, k.r < 0.1 ? 2 : 1)} % от цены"><span class="bar"><i class="b" style="width:${w}%"></i><i class="s" style="width:${100 - w}%"></i></span><span class="${w >= 55 ? 'up' : w <= 45 ? 'dn' : 'mut'}">${Math.round(w)} %</span></span>`; };
 const COLS = [
-  { k: 'base', t: 'Монета', txt: 1, f: r => `<a href="?c=${r.base}"><b>${r.base}</b></a>` },
+  { k: 'base', t: 'Монета', txt: 1, f: r => `${favBox(r.base)}<a href="?c=${r.base}"><b>${r.base}</b></a>` },
   { k: 'px', t: 'Цена', f: r => fp(r.px) },
   { k: 'c1', t: '1 мин', f: r => chg(r.c1, 2) }, { k: 'c5', t: '5 мин', f: r => chg(r.c5, 2) }, { k: 'c24', t: '24 ч', f: r => chg(r.c24, 1) },
   { k: 'turn', t: 'Оборот 24 ч', f: r => fu(r.turn) },
@@ -168,21 +172,27 @@ const COLS = [
   { k: 'bk', t: 'Стакан: покупка', f: r => r.bk == null ? '<span class="mut">—</span>' : mini(r.c), tip: 'Доля денег на покупку в стакане фьючерса Bybit в пределах 1 % от цены' },
   { k: 'nv', t: 'Площадок', f: r => r.nv, tip: 'На скольких площадках из шести монета торгуется' },
 ];
-let sort = { k: 'turn', d: -1 };
+let sort = { k: 'turn', d: -1 }, fav = new Set(), mine = false; // fav — монеты, отмеченные галочкой; mine — показывать только их
+try { fav = new Set(JSON.parse(localStorage.getItem('plfav') || '[]')); mine = localStorage.getItem('plmine') === '1'; } catch { /* хранилище недоступно — выбор живёт до закрытия вкладки */ }
+const saveFav = () => { try { localStorage.setItem('plfav', JSON.stringify([...fav])); localStorage.setItem('plmine', mine ? '1' : '0'); } catch { /* не страшно */ } };
+const favBox = b => `<input type="checkbox" class="fv" data-f="${b}"${fav.has(b) ? ' checked' : ''} title="Отметить монету — потом можно показать только отмеченные" aria-label="Отметить ${b}">`;
 try { const s = JSON.parse(sessionStorage.getItem('pl') || 'null'); if (s) { sort = s.sort; $('#fv').value = s.fv; $('#ft').value = s.ft; $('#fb').value = s.fb; } } catch { /* по умолчанию */ }
 function drawHead() { $('#lh').innerHTML = COLS.map(c => `<th class="s${sort.k === c.k ? ' on' : ''}" data-k="${c.k}"${c.tip ? ` title="${c.tip}"` : ''}>${c.t}${sort.k === c.k ? (sort.d > 0 ? ' ▲' : ' ▼') : ''}</th>`).join(''); }
 function drawList() {
   if (view !== 'list') return;
   const q = $('#q').value.trim().toUpperCase(), fv = $('#fv').value, ft = +$('#ft').value, fb = $('#fb').value; let rows = [], total = 0;
-  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (fv && !(c.v[fv]?.px > 0)) continue; if (r.turn < ft) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; rows.push(r); }
+  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (mine) { if (!fav.has(c.base)) continue; } else { if (fv && !(c.v[fv]?.px > 0)) continue; if (r.turn < ft) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; } rows.push(r); }
   const col = COLS.find(c => c.k === sort.k), k = sort.k, d = sort.d;
   rows.sort((a, b) => col.txt ? d * a[k].localeCompare(b[k]) : (a[k] == null) - (b[k] == null) || d * (a[k] - b[k]) || b.turn - a.turn);
-  $('#lb').innerHTML = rows.length ? rows.map(r => `<tr data-c="${r.base}">${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${COLS.length}" class="mut">${total ? 'Под фильтры ничего не подходит.' + (q && /^[A-Z0-9]{2,}$/.test(q) ? ` <a href="?c=${q}" style="text-decoration:underline">Открыть ${q}</a>` : '') : 'Загружаю монеты с бирж…'}</td></tr>`;
+  $('#lb').innerHTML = rows.length ? rows.map(r => `<tr data-c="${r.base}">${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${COLS.length}" class="mut">${total ? (mine && !fav.size ? 'Вы ещё не отметили ни одной монеты. Нажмите «Только мои» ещё раз, чтобы увидеть все монеты, и поставьте галочки у нужных.' : mine ? 'Среди отмеченных монет такой нет.' : 'Под фильтры ничего не подходит.') + (q && /^[A-Z0-9]{2,}$/.test(q) ? ` <a href="?c=${q}" style="text-decoration:underline">Открыть ${q}</a>` : '') : 'Загружаю монеты с бирж…'}</td></tr>`;
+  $('#mine').textContent = (mine ? '☑' : '☐') + ' Только мои' + (fav.size ? ` (${fav.size})` : ''); $('#mine').className = mine ? 'on' : ''; $('#clr').hidden = !(mine && fav.size); for (const id of ['#fv', '#ft', '#fb']) $(id).disabled = mine;
   $('#cnt').textContent = total ? `показано ${rows.length} из ${total}` : ''; $('#stamp').textContent = bulkOk ? 'обновлено ' + new Date(bulkOk).toLocaleTimeString('ru-RU') : '';
   sessionStorage.setItem('pl', JSON.stringify({ sort, fv, ft: $('#ft').value, fb }));
 }
 $('#lh').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; sort = sort.k === k ? { k, d: -sort.d } : { k, d: COLS.find(c => c.k === k).txt ? 1 : -1 }; drawHead(); drawList(); };
-$('#lb').onclick = e => { const tr = e.target.closest('tr[data-c]'), a = e.target.closest('a[href^="?c="]'); const c = tr ? tr.dataset.c : a ? a.getAttribute('href').slice(3) : ''; if (c) { e.preventDefault(); go(c, true); } };
+const favClick = e => { const f = e.target.closest('input[data-f]'); if (!f) return false; if (f.checked) fav.add(f.dataset.f); else fav.delete(f.dataset.f); saveFav(); return true; };
+$('#mine').onclick = () => { mine = !mine; saveFav(); drawList(); }; $('#clr').onclick = () => { fav.clear(); saveFav(); drawList(); };
+$('#lb').onclick = e => { if (favClick(e)) { drawList(); return; } const tr = e.target.closest('tr[data-c]'), a = e.target.closest('a[href^="?c="]'); const c = tr ? tr.dataset.c : a ? a.getAttribute('href').slice(3) : ''; if (c) { e.preventDefault(); go(c, true); } };
 for (const id of ['#q', '#fv', '#ft', '#fb']) $(id).oninput = drawList;
 
 // ===================== СТРАНИЦА МОНЕТЫ: подробные данные по каждой площадке =====================
@@ -250,7 +260,7 @@ function drawCoin() {
     if (x.o && x.o.usd > 0) { oi += x.o.usd; oi5 += x.o.usd / (1 + (x.o.c5 || 0) / 100); oi60 += x.o.usd / (1 + (x.o.c60 || 0) / 100); }
     const p = s.d.mid / s.mult; if (p > 0) { if (!lo || p < lo.p) lo = { p, s }; if (!hi || p > hi.p) hi = { p, s }; } }
   const p0 = live[0], x0 = p0 && X.get(p0), spread = lo && hi && lo.s !== hi.s ? (hi.p / lo.p - 1) * 100 : null;
-  $('#dh').innerHTML = `<span class="nm">${coin}</span>` + (p0 ? `<span class="px">${fp(p0.d.mid)}</span><span>${chg(x0.p1 ? (p0.d.mid / x0.p1 - 1) * 100 : null, 2)} <span class="mut">за 1 мин</span></span><span>${chg(x0.p5 ? (p0.d.mid / x0.p5 - 1) * 100 : null, 2)} <span class="mut">за 5 мин</span></span><span class="mut sm">цена — ${NAME[p0.v.k]} · на связи ${live.length} из ${VEN.length} площадок</span>` : `<span class="mut">${Object.values(ST).some(s => s.sym) ? 'загружаю…' : 'такой монеты нет ни на одной из шести площадок'}</span>`);
+  $('#dh').innerHTML = `<span class="nm">${coin}</span><label class="sm mut" style="cursor:pointer">${favBox(coin)}в моём списке</label>` + (p0 ? `<span class="px">${fp(p0.d.mid)}</span><span>${chg(x0.p1 ? (p0.d.mid / x0.p1 - 1) * 100 : null, 2)} <span class="mut">за 1 мин</span></span><span>${chg(x0.p5 ? (p0.d.mid / x0.p5 - 1) * 100 : null, 2)} <span class="mut">за 5 мин</span></span><span class="mut sm">цена — ${NAME[p0.v.k]} · на связи ${live.length} из ${VEN.length} площадок</span>` : `<span class="mut">${Object.values(ST).some(s => s.sym) ? 'загружаю…' : 'такой монеты нет ни на одной из шести площадок'}</span>`);
   $('#tiles').innerHTML = !live.length ? '' : `
     <div class="tile"><h3>Стакан ±${fn(r)} % — все площадки</h3>${bar(b, a)}</div>
     <div class="tile"><h3>Лента за 1 минуту — все площадки</h3>${bar(t1[0], t1[1])}</div>
@@ -275,6 +285,7 @@ function show(c) {
   if (c) startCoin(c); else { run++; drawHead(); drawList(); }
 }
 function go(c, push) { c = (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, ''); if (push) history.pushState(null, '', c ? '?c=' + encodeURIComponent(c) : location.pathname); show(c); }
+$('#dh').onclick = e => { favClick(e); };
 $('#back').onclick = () => go('', true); $('#home').onclick = e => { e.preventDefault(); go('', true); };
 $('#rng').onchange = drawCoin; window.onpopstate = () => go(new URLSearchParams(location.search).get('c') || '');
 let tickN = 0; setInterval(() => { tickN++; if (view === 'coin') { if (dirty || tickN % 5 === 0) drawCoin(); } else if (!document.hidden && tickN % 2 === 0) drawList(); }, 1000);
