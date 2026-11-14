@@ -47,7 +47,17 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
 #pkok{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:650;min-width:84px}
 #lt tbody tr.sel td{background-image:linear-gradient(var(--selc),var(--selc))}
 @media (pointer:coarse),(max-width:900px){.fv{width:22px;height:22px;margin-right:10px;vertical-align:-5px} button,select,input:not(.fv){padding:9px 12px} #lt td{padding-top:10px;padding-bottom:10px}}
-#mine.on{border-color:var(--acc);color:var(--acc);font-weight:650}
+#mine.on,.chip.on{border-color:var(--acc);color:var(--acc);font-weight:650}
+.grp{display:inline-flex;gap:4px;align-items:center}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);padding:0;width:100%;max-width:min(440px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{padding:14px 16px} dialog h2{font-size:16px;margin:0 0 10px} dialog p{margin:0 0 9px}
+dialog label{display:block;margin:0 0 9px;color:var(--mut);font-size:12.5px}
+dialog label input:not([type=checkbox]),dialog label select{display:block;width:100%;margin-top:3px;color:var(--fg);font-size:14px}
+dialog label.ck{color:var(--fg);font-size:13px;cursor:pointer} dialog label.ck input{margin:0 6px 0 0;vertical-align:-2px}
+dialog .row{display:flex;gap:8px;align-items:flex-end} dialog .row>*{flex:1 1 0;min-width:0}
+.btn{display:inline-block;text-align:center;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel);color:inherit;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:650} .btn.off{opacity:.45;pointer-events:none} dialog .row>#algo{flex:2.2 1 0}
 [hidden]{display:none!important}
 @media (max-width:900px){body{font-size:13px} main{height:auto;display:block} .tiles{grid-template-columns:repeat(2,minmax(0,1fr))} .tw{max-height:none}}
 </style>
@@ -57,6 +67,7 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
 <header>
   <h1><a href="./" id="home">Пульс · монеты онлайн</a></h1>
   <button id="back" hidden>← Все монеты</button>
+  <button id="dbell" hidden title="Бот сообщит в Телеграм, когда по этой монете случится нужное событие">🔔 Уведомление</button>
   <label class="mut" id="rngL" hidden>Стакан рядом с ценой: <select id="rng"><option value="0.5">±0,5 %</option><option value="1" selected>±1 %</option><option value="2">±2 %</option></select></label>
   <span id="stamp" class="mut sm"></span>
 </header>
@@ -64,12 +75,17 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
 <section id="list" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
   <div class="tools">
     <input id="q" placeholder="Поиск монеты" autocomplete="off" aria-label="Поиск монеты" style="width:150px;text-transform:uppercase">
-    <select id="fv" aria-label="Биржа"><option value="">Все биржи</option><option value="byf">Есть на Bybit</option><option value="bnf">Есть на Binance</option><option value="gtf">Есть на Gate</option></select>
-    <select id="ft" aria-label="Оборот"><option value="0">Любой оборот</option><option value="1e6" selected>Оборот от 1 млн</option><option value="1e7">Оборот от 10 млн</option><option value="1e8">Оборот от 100 млн</option></select>
+    <span class="grp" id="exs" role="group" aria-label="Биржи" title="Какие биржи учитывать: монеты и все цифры в таблице берутся только с отмеченных"><span class="mut sm">Биржи:</span><button class="chip" data-x="by">Bybit</button><button class="chip" data-x="bn">Binance</button><button class="chip" data-x="gt">Gate</button></span>
+    <span class="grp" title="Оборот фьючерсов за сутки на отмеченных биржах, USDT">
+      <select id="ft" aria-label="Оборот от"><option value="0">Оборот от 0</option><option value="1e5">Оборот от 100 тыс.</option><option value="5e5">Оборот от 500 тыс.</option><option value="1e6" selected>Оборот от 1 млн</option><option value="5e6">Оборот от 5 млн</option><option value="1e7">Оборот от 10 млн</option><option value="5e7">Оборот от 50 млн</option><option value="1e8">Оборот от 100 млн</option></select>
+      <select id="fto" aria-label="Оборот до"><option value="" selected>до — без ограничения</option><option value="1e6">до 1 млн</option><option value="5e6">до 5 млн</option><option value="1e7">до 10 млн</option><option value="5e7">до 50 млн</option><option value="1e8">до 100 млн</option></select>
+    </span>
     <select id="fb" aria-label="Стакан"><option value="">Любой стакан</option><option value="buy">Перевес покупателей (от 60 %)</option><option value="sell">Перевес продавцов (от 60 %)</option></select>
     <button id="pick" title="Отметить монеты, которые вам интересны">☑ Выбрать монеты</button>
     <button id="mine" title="Показывать только монеты, отмеченные галочкой">☐ Только мои</button>
+    <button id="bell" title="Бот сообщит в Телеграм, когда по монете случится нужное событие">🔔 Уведомление</button>
     <button id="clr" class="sm" hidden>Снять все галочки</button>
+    <button id="rst" class="sm" hidden>Сбросить фильтры</button>
     <span id="cnt" class="mut sm"></span>
   </div>
   <div id="pk" hidden><span>Нажимайте на нужные монеты. Отмечено: <b id="pkn">0</b></span><button id="pkok">ОК</button><button id="pkno">Отмена</button><button id="pkclr" class="sm">Снять все</button></div>
@@ -88,8 +104,33 @@ footer{margin-top:6px;color:var(--mut);font-size:12px}
   <summary>Что здесь показано</summary>
   <p><b>Стакан</b> — сколько денег стоит в заявках на покупку (зелёное) и на продажу (красное) рядом с ценой, в процентах и в USDT. В списке монет — по стакану фьючерса Bybit в пределах 1 % от цены, обходится по кругу примерно за полторы минуты.</p>
   <p><b>Лента</b> — кто активнее торгует по рынку: покупатели (зелёное) или продавцы (красное). <b>Открытый интерес (ОИ)</b> — сумма открытых позиций на фьючерсе; на странице монеты синий столбик — доля биржи в общей сумме. <b>Финансирование</b> — плюс платят лонги, минус платят шорты. <b>Разброс бирж</b> — на сколько процентов самая дорогая площадка дороже самой дешёвой.</p>
+  <p><b>Биржи</b> — отметьте одну, две или все три: в таблице останутся монеты, у которых есть фьючерс на отмеченных биржах, а цена, оборот, открытый интерес и остальные цифры считаются только по ним. <b>Оборот «от» и «до»</b> — например «от 0» и «до 1 млн» покажет малоликвидные монеты.</p>
+  <p><b>🔔 Уведомление</b> — выберите монету и событие (цена дошла до уровня, выросла или упала на заданный процент, перевес в стакане, открытый интерес, финансирование, разброс бирж) и нажмите «Создать в Телеграме»: бот «Пульс — сигналы» сообщит один раз, когда событие случится. Работает у подписчиков бота.</p>
   <p>Столбцы «1 мин», «5 мин» и «ОИ 5 мин» в списке считаются с момента открытия страницы и заполняются через 1 и 5 минут. Данные приходят в ваш браузер напрямую с Bybit, Binance и Gate. Это наблюдение, а не совет.</p>
 </details>
+<dialog id="al"><form method="dialog">
+  <h2>🔔 Уведомление в Телеграм</h2>
+  <label>Монета<input id="alc" list="alcl" autocomplete="off" placeholder="например BTC" style="text-transform:uppercase"></label><datalist id="alcl"></datalist>
+  <label class="ck" id="alml" hidden><input type="checkbox" id="alm">сразу для всех моих монет (<span id="almn"></span>)</label>
+  <label>О чём сообщить<select id="alk">
+    <option value="p">Цена дойдёт до уровня</option>
+    <option value="mu">Цена вырастет на … %</option>
+    <option value="md">Цена упадёт на … %</option>
+    <option value="mm">Цена изменится на … % (в любую сторону)</option>
+    <option value="bb">Стакан: покупателей не меньше … %</option>
+    <option value="bs">Стакан: продавцов не меньше … %</option>
+    <option value="ou">Открытый интерес вырастет на … %</option>
+    <option value="od">Открытый интерес упадёт на … %</option>
+    <option value="fa">Финансирование поднимется до +… %</option>
+    <option value="fb">Финансирование опустится до −… %</option>
+    <option value="sp">Разброс цен между биржами от … %</option>
+  </select></label>
+  <div class="row"><label><span id="alvt">Уровень цены</span><input id="alv" inputmode="decimal" autocomplete="off"></label><label id="alwl" hidden>За какое время<select id="alw"><option value="5">5 минут</option><option value="15" selected>15 минут</option><option value="60">1 час</option></select></label></div>
+  <p id="aln" class="sm"></p>
+  <p id="ale" class="sm warn"></p>
+  <div class="row"><a id="algo" class="btn pri" target="_blank" rel="noopener">Создать в Телеграме</a><button type="button" id="alx" class="btn">Закрыть</button></div>
+  <p class="sm mut" style="margin-top:10px">Откроется бот «Пульс — сигналы» — нажмите в нём «Запустить» (Start). Уведомление придёт один раз, когда событие случится. Список и удаление — кнопка «🔔 Мои уведомления» в боте. Работает у подписчиков бота.</p>
+</form></dialog>
 </main>
 <script>
 'use strict';
@@ -115,14 +156,14 @@ let view = 'list', coin = '';
 const L = new Map(), bad = new Set(); // монета → { base, v: { площадка: { sym, mult, px, … } }, h: [[t, цена, ОИ]] }; bad — акции, фонды, сырьё
 const RX = /^[A-Z0-9]+_?USDT$/;
 function put(k, rows) {
-  const t = Date.now();
+  const t = Date.now(), fut = FUT.includes(k);
   for (const r of rows) {
     if (!RX.test(r.s) || (k === 'gts' && /\d[LS]_USDT$/.test(r.s))) continue;
-    const [base, mult] = baseOf(r.s); let c = L.get(base); if (!c) L.set(base, c = { base, v: {}, h: [] });
+    const [base, mult] = baseOf(r.s); let c = L.get(base); if (!c) L.set(base, c = { base, v: {} });
     let o = c.v[k]; if (o && o.sym !== r.s && mult !== 1) continue; if (!o || o.sym !== r.s) o = c.v[k] = { sym: r.s, mult };
     Object.assign(o, r, { t });
+    if (fut && 'px' in r && o.px > 0) { const h = o.h || (o.h = []), last = h[h.length - 1]; if (!last || t - last[0] >= 9000) { h.push([t, o.px, o.oi || 0]); while (h[0][0] < t - 6.5 * 60e3) h.shift(); } } // у каждого фьючерса своя история: [время, цена, ОИ] раз в ~10 с, 6,5 минуты
   }
-  for (const c of L.values()) { const p = prim(c); if (p !== k) continue; const o = c.v[p], last = c.h[c.h.length - 1]; if (o.px > 0 && (!last || t - last[0] >= 9000)) { c.h.push([t, o.px, c.v.byf?.oi || 0]); while (c.h[0][0] < t - 6.5 * 60e3) c.h.shift(); } }
 }
 const prim = c => ALLV.find(k => c.v[k]?.px > 0);
 const BULK = [
@@ -130,7 +171,7 @@ const BULK = [
   { k: 'bnf', every: 6000, get: async () => (await j(BF + '/fapi/v1/ticker/bookTicker')).map(x => ({ s: x.symbol, px: mid(x.bidPrice, x.askPrice, 0) })) },
   { k: 'bnf', every: 30000, get: async () => (await j(BF + '/fapi/v1/ticker/24hr')).map(x => ({ s: x.symbol, c24: +x.priceChangePercent, turn: +x.quoteVolume })) },
   { k: 'bnf', every: 60000, get: async () => (await j(BF + '/fapi/v1/premiumIndex')).map(x => ({ s: x.symbol, fund: +x.lastFundingRate * 100 })) },
-  { k: 'gtf', every: 15000, get: async () => (await j(GT + '/futures/usdt/tickers', 20000)).map(x => ({ s: x.contract, px: mid(x.highest_bid, x.lowest_ask, x.last), c24: +x.change_percentage, turn: +x.volume_24h_quote, oi: +x.total_size * +x.quanto_multiplier * +x.mark_price, fund: +x.funding_rate * 100 })) },
+  { k: 'gtf', every: 15000, get: async () => (await j(GT + '/futures/usdt/tickers', 20000)).map(x => ({ s: x.contract, px: mid(x.highest_bid, x.lowest_ask, x.last), c24: +x.change_percentage, turn: +x.volume_24h_quote, oi: +x.total_size * +x.quanto_multiplier * +x.mark_price, fund: +x.funding_rate * 100, qm: +x.quanto_multiplier || 1 })) },
   { k: 'bys', every: 12000, get: async () => (await by('/v5/market/tickers?category=spot', 12000)).list.map(x => ({ s: x.symbol, px: mid(x.bid1Price, x.ask1Price, x.lastPrice), turn: +x.turnover24h })) },
   { k: 'bns', every: 12000, get: async () => (await j(BS + '/api/v3/ticker/bookTicker')).map(x => ({ s: x.symbol, px: mid(x.bidPrice, x.askPrice, 0) })) },
   { k: 'gts', every: 15000, get: async () => (await j(GT + '/spot/tickers', 20000)).map(x => ({ s: x.currency_pair, px: mid(x.highest_bid, x.lowest_ask, x.last), turn: +x.quote_volume })) },
@@ -143,60 +184,77 @@ const ready = (async () => { for (let i = 0; i < 100 && !BULK.every(b => b.done)
 async function loadTypes() { try { for (let cur = '', n = 0; n < 5; n++) { const r = await by('/v5/market/instruments-info?category=linear&limit=1000' + (cur ? '&cursor=' + encodeURIComponent(cur) : ''), 15000); for (const x of r.list) if (x.symbolType && x.symbolType !== 'innovation') bad.add(baseOf(x.symbol)[0]); cur = r.nextPageCursor; if (!cur) break; } } catch { /* без отсева */ } }
 function book(d, r) { // деньги в заявках в пределах r % от цены; если стакан отдан не на всю глубину — сравниваем на одинаковом расстоянии
   const m = d.mid; if (!(m > 0) || !d.bids.length || !d.asks.length) return null;
-  const cb = d.bids.length < 95 ? 99 : (m - d.bids[d.bids.length - 1][0]) / m * 100, ca = d.asks.length < 95 ? 99 : (d.asks[d.asks.length - 1][0] - m) / m * 100;
+  const full = d.full || 95, cb = d.bids.length < full ? 99 : (m - d.bids[d.bids.length - 1][0]) / m * 100, ca = d.asks.length < full ? 99 : (d.asks[d.asks.length - 1][0] - m) / m * 100; // уровней меньше запрошенного — стакан отдан целиком
   const rr = Math.min(r, Math.max(0.01, Math.min(cb, ca)));
   let b = 0, a = 0; for (const [p, u] of d.bids) if (p >= m * (1 - rr / 100)) b += u; for (const [p, u] of d.asks) if (p <= m * (1 + rr / 100)) a += u;
   const top = l => { let t = null; for (const [p, u] of l) if (Math.abs(p - m) / m <= 0.02 && (!t || u > t[1])) t = [p, u]; return t && { p: t[0], u: t[1], dist: (t[0] / m - 1) * 100 }; };
   return { b, a, r: rr, cut: rr < r - 1e-9, wb: top(d.bids), wa: top(d.asks) };
 }
-async function scanBooks() { // стаканы фьючерсов Bybit по кругу, ~6 запросов в секунду, самые оборотистые первыми
+// Выбор бирж (с 15.11.2026): ex — отмеченные биржи; монеты и все цифры списка берутся только с их площадок.
+const EXN = ['by', 'bn', 'gt']; let ex = new Set(EXN), bkGen = 0;
+const allowed = () => ALLV.filter(k => ex.has(k.slice(0, 2)));
+const BKV = ['byf', 'gtf', 'bnf']; // чей стакан показывать в списке: Bybit, а если монеты там нет или биржа не отмечена — Gate, затем Binance
+async function obOf(k, o) { // стакан фьючерса → заявки в USDT
+  if (k === 'byf') { const ob = await by(`/v5/market/orderbook?category=linear&symbol=${o.sym}&limit=100`); return { bids: lv(ob.b), asks: lv(ob.a) }; }
+  if (k === 'gtf') { const ob = await j(`${GT}/futures/usdt/order_book?contract=${o.sym}&limit=100`), q = o.qm || 1; return { bids: ob.bids.map(l => [+l.p, +l.p * +l.s * q]), asks: ob.asks.map(l => [+l.p, +l.p * +l.s * q]) }; }
+  const ob = await j(`${BF}/fapi/v1/depth?symbol=${o.sym}&limit=100`); return { bids: lv(ob.bids), asks: lv(ob.asks) };
+}
+const BKMS = { byf: 330, gtf: 330, bnf: 750 }; // пауза на один запрос у каждого из трёх обходчиков; у Binance общий лимит запросов — идём медленнее
+async function scanBooks() { // стаканы фьючерсов по кругу, до ~9 запросов в секунду, самые оборотистые первыми
   for (; ;) {
-    const list = view === 'list' && !document.hidden ? [...L.values()].filter(c => c.v.byf?.px > 0 && !bad.has(c.base)).sort((a, b) => (b.v.byf.turn || 0) - (a.v.byf.turn || 0)) : [];
+    const vs = allowed(), gen = bkGen, on = () => view === 'list' && !document.hidden && gen === bkGen;
+    const list = on() ? [...L.values()].map(c => { const k = BKV.find(k => vs.includes(k) && c.v[k]?.px > 0); return k && !bad.has(c.base) ? { c, k, o: c.v[k] } : null; }).filter(Boolean).sort((a, b) => (b.o.turn || 0) - (a.o.turn || 0)) : [];
     if (!list.length) { await sleep(1000); continue; }
-    let i = 0; const worker = async () => { while (i < list.length && view === 'list' && !document.hidden) { const c = list[i++], t0 = Date.now(); try { const ob = await by(`/v5/market/orderbook?category=linear&symbol=${c.v.byf.sym}&limit=100`), bids = lv(ob.b), asks = lv(ob.a), bk = book({ bids, asks, mid: mid(bids[0]?.[0], asks[0]?.[0], c.v.byf.px) }, 1); if (bk && bk.b + bk.a > 0) c.bk = { p: bk.b / (bk.b + bk.a) * 100, b: bk.b, a: bk.a, r: bk.r }; } catch { await sleep(1500); } await sleep(Math.max(0, 330 - (Date.now() - t0))); } };
+    let i = 0; const worker = async () => { while (i < list.length && on()) { const { c, k, o } = list[i++], t0 = Date.now(); try { const d = await obOf(k, o); d.mid = mid(d.bids[0]?.[0], d.asks[0]?.[0], o.px); const bk = book(d, 1); if (bk && bk.b + bk.a > 0) c.bk = { p: bk.b / (bk.b + bk.a) * 100, b: bk.b, a: bk.a, r: bk.r, k }; } catch { await sleep(1500); } await sleep(Math.max(0, BKMS[k] - (Date.now() - t0))); } };
     await Promise.all([worker(), worker(), worker()]); await sleep(500);
   }
 }
-const hAt = (c, ms, i) => { const T = Date.now() - ms; let v = null; for (const s of c.h) { if (s[0] <= T) v = s[i]; else break; } return v; };
-function rowOf(c) {
-  const p = prim(c); if (!p) return null; const o = c.v[p], f = FUT.map(k => c.v[k]).filter(x => x && x.px > 0); if (!f.length) return null;
-  const ref = o.px / o.mult, ps = ALLV.map(k => c.v[k]).filter(x => x && x.px > 0 && Math.abs(Math.log(x.px / x.mult / ref)) < 0.2).map(x => x.px / x.mult);
-  const p1 = hAt(c, 60e3, 1), p5 = hAt(c, 300e3, 1), o5 = hAt(c, 300e3, 2), oiB = c.v.byf?.oi || 0, oi = oiB + (c.v.gtf?.oi || 0), fd = f.find(x => x.fund != null);
-  return { c, base: c.base, px: o.px, c1: p1 ? (o.px / p1 - 1) * 100 : null, c5: p5 ? (o.px / p5 - 1) * 100 : null, c24: f.find(x => x.c24 != null)?.c24 ?? null, turn: f.reduce((s, x) => s + (x.turn || 0), 0), oi: oi > 0 ? oi : null, oi5: o5 > 0 && oiB > 0 ? (oiB / o5 - 1) * 100 : null,
-    fund: fd ? fd.fund : null, spr: ps.length > 1 ? (Math.max(...ps) / Math.min(...ps) - 1) * 100 : null, bk: c.bk ? c.bk.p : null, nv: ALLV.filter(k => c.v[k]?.px > 0).length };
+const hAt = (h, ms, i) => { const T = Date.now() - ms; let v = null; for (const s of h || []) { if (s[0] <= T) v = s[i]; else break; } return v; };
+function rowOf(c, vs = ALLV) { // vs — площадки отмеченных бирж; строка есть, только если на них есть фьючерс этой монеты
+  const p = FUT.find(k => vs.includes(k) && c.v[k]?.px > 0); if (!p) return null; const o = c.v[p], f = FUT.filter(k => vs.includes(k)).map(k => c.v[k]).filter(x => x && x.px > 0);
+  const ref = o.px / o.mult, ps = vs.map(k => c.v[k]).filter(x => x && x.px > 0 && Math.abs(Math.log(x.px / x.mult / ref)) < 0.2).map(x => x.px / x.mult);
+  const p1 = hAt(o.h, 60e3, 1), p5 = hAt(o.h, 300e3, 1), ov = f.find(x => x.oi > 0), o5 = ov ? hAt(ov.h, 300e3, 2) : null, oi = f.reduce((s, x) => s + (x.oi || 0), 0), fd = f.find(x => x.fund != null);
+  return { c, base: c.base, pk: p, px: o.px, c1: p1 ? (o.px / p1 - 1) * 100 : null, c5: p5 ? (o.px / p5 - 1) * 100 : null, c24: f.find(x => x.c24 != null)?.c24 ?? null, turn: f.reduce((s, x) => s + (x.turn || 0), 0), oi: oi > 0 ? oi : null, oi5: o5 > 0 ? (ov.oi / o5 - 1) * 100 : null,
+    fund: fd ? fd.fund : null, spr: ps.length > 1 ? (Math.max(...ps) / Math.min(...ps) - 1) * 100 : null, bk: c.bk && vs.includes(c.bk.k) ? c.bk.p : null, nv: vs.filter(k => c.v[k]?.px > 0).length };
 }
-const mini = (c) => { const k = c.bk, w = k.p; return `<span class="mini" title="покупка ${fu(k.b)} USDT · продажа ${fu(k.a)} USDT · в пределах ±${fn(k.r, k.r < 0.1 ? 2 : 1)} % от цены"><span class="bar"><i class="b" style="width:${w}%"></i><i class="s" style="width:${100 - w}%"></i></span><span class="${w >= 55 ? 'up' : w <= 45 ? 'dn' : 'mut'}">${Math.round(w)} %</span></span>`; };
+const mini = (c) => { const k = c.bk, w = k.p; return `<span class="mini" title="${NAME[k.k]} · покупка ${fu(k.b)} USDT · продажа ${fu(k.a)} USDT · в пределах ±${fn(k.r, k.r < 0.1 ? 2 : 1)} % от цены"><span class="bar"><i class="b" style="width:${w}%"></i><i class="s" style="width:${100 - w}%"></i></span><span class="${w >= 55 ? 'up' : w <= 45 ? 'dn' : 'mut'}">${Math.round(w)} %</span></span>`; };
 const COLS = [
   { k: 'base', t: 'Монета', txt: 1, f: r => `${favBox(r.base)}<a href="?c=${r.base}"><b>${r.base}</b></a>` },
   { k: 'px', t: 'Цена', f: r => fp(r.px) },
   { k: 'c1', t: '1 мин', f: r => chg(r.c1, 2) }, { k: 'c5', t: '5 мин', f: r => chg(r.c5, 2) }, { k: 'c24', t: '24 ч', f: r => chg(r.c24, 1) },
   { k: 'turn', t: 'Оборот 24 ч', f: r => fu(r.turn) },
-  { k: 'oi', t: 'Откр. интерес', f: r => r.oi ? fu(r.oi) : '<span class="mut">—</span>', tip: 'Сумма открытых позиций на фьючерсах Bybit и Gate, USDT' },
-  { k: 'oi5', t: 'ОИ 5 мин', f: r => chg(r.oi5, 2), tip: 'Изменение открытого интереса на Bybit за 5 минут' },
+  { k: 'oi', t: 'Откр. интерес', f: r => r.oi ? fu(r.oi) : '<span class="mut">—</span>', tip: 'Сумма открытых позиций на фьючерсах Bybit и Gate (из отмеченных бирж), USDT' },
+  { k: 'oi5', t: 'ОИ 5 мин', f: r => chg(r.oi5, 2), tip: 'Изменение открытого интереса за 5 минут (Bybit, а если его нет — Gate)' },
   { k: 'fund', t: 'Финанс.', f: r => chg(r.fund, 4), tip: 'Ставка финансирования: плюс — платят лонги, минус — шорты' },
   { k: 'spr', t: 'Разброс бирж', f: r => r.spr == null ? '<span class="mut">—</span>' : `<span class="${r.spr >= 1 ? 'warn' : ''}">${fn(r.spr, 2)} %</span>`, tip: 'На сколько самая дорогая площадка дороже самой дешёвой' },
-  { k: 'bk', t: 'Стакан: покупка', f: r => r.bk == null ? '<span class="mut">—</span>' : mini(r.c), tip: 'Доля денег на покупку в стакане фьючерса Bybit в пределах 1 % от цены' },
-  { k: 'nv', t: 'Площадок', f: r => r.nv, tip: 'На скольких площадках из шести монета торгуется' },
+  { k: 'bk', t: 'Стакан: покупка', f: r => r.bk == null ? '<span class="mut">—</span>' : mini(r.c), tip: 'Доля денег на покупку в стакане фьючерса в пределах 1 % от цены (Bybit, а если монеты там нет или биржа не отмечена — Gate или Binance)' },
+  { k: 'nv', t: 'Площадок', f: r => r.nv, tip: 'На скольких площадках отмеченных бирж монета торгуется (фьючерс и спот считаются отдельно)' },
 ];
 let sort = { k: 'turn', d: -1 }, fav = new Set(), mine = false; // fav — монеты, отмеченные галочкой; mine — показывать только их
 try { fav = new Set(JSON.parse(localStorage.getItem('plfav') || '[]')); mine = localStorage.getItem('plmine') === '1'; } catch { /* хранилище недоступно — выбор живёт до закрытия вкладки */ }
 const saveFav = () => { try { localStorage.setItem('plfav', JSON.stringify([...fav])); localStorage.setItem('plmine', mine ? '1' : '0'); } catch { /* не страшно */ } };
 let pick = false, tmp = new Set(), touching = false; // pick — идёт выбор монет (до «ОК» отметки лежат в tmp); touching — палец на экране, таблицу не перерисовываем
 const favBox = b => `<input type="checkbox" class="fv" data-f="${b}"${(pick ? tmp : fav).has(b) ? ' checked' : ''} title="Отметить монету — потом можно показать только отмеченные" aria-label="Отметить ${b}">`;
-try { const s = JSON.parse(sessionStorage.getItem('pl') || 'null'); if (s) { sort = s.sort; $('#fv').value = s.fv; $('#ft').value = s.ft; $('#fb').value = s.fb; } } catch { /* по умолчанию */ }
+try { const s = JSON.parse(localStorage.getItem('plf') || 'null'); if (s) { if (COLS.some(c => c.k === s.sort?.k)) sort = s.sort; const e = (s.ex || []).filter(x => EXN.includes(x)); if (e.length) ex = new Set(e); for (const [id, v] of [['#ft', s.ft], ['#fto', s.fto], ['#fb', s.fb]]) if ([...$(id).options].some(o => o.value === v)) $(id).value = v; } } catch { /* по умолчанию */ } // фильтры запоминаются в браузере трейдера
 function drawHead() { $('#lh').innerHTML = COLS.map(c => `<th class="s${sort.k === c.k ? ' on' : ''}" data-k="${c.k}"${c.tip ? ` title="${c.tip}"` : ''}>${c.t}${sort.k === c.k ? (sort.d > 0 ? ' ▲' : ' ▼') : ''}</th>`).join(''); }
 function drawList() {
   if (view !== 'list') return;
-  const q = $('#q').value.trim().toUpperCase(), fv = $('#fv').value, ft = +$('#ft').value, fb = $('#fb').value; let rows = [], total = 0;
-  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (pick ? tmp.has(c.base) : mine) { if (!pick && !fav.has(c.base)) continue; } else { if (fv && !(c.v[fv]?.px > 0)) continue; if (r.turn < ft) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; } rows.push(r); }
+  const q = $('#q').value.trim().toUpperCase(), vs = allowed(), ft = +$('#ft').value, fto = +$('#fto').value || Infinity, fb = $('#fb').value; let rows = [], total = 0;
+  for (const c of L.values()) { if (bad.has(c.base)) continue; const r = rowOf(c, vs); if (!r) continue; total++; if (q && !c.base.includes(q)) continue; if (pick ? tmp.has(c.base) : mine) { if (!pick && !fav.has(c.base)) continue; } else { if (r.turn < ft || r.turn > fto) continue; if (fb && (r.bk == null || (fb === 'buy' ? r.bk < 60 : r.bk > 40))) continue; } rows.push(r); }
   const col = COLS.find(c => c.k === sort.k), k = sort.k, d = sort.d;
   rows.sort((a, b) => (pick ? tmp.has(b.base) - tmp.has(a.base) : 0) || (col.txt ? d * a[k].localeCompare(b[k]) : (a[k] == null) - (b[k] == null) || d * (a[k] - b[k]) || b.turn - a.turn));
   $('#lb').innerHTML = rows.length ? rows.map(r => `<tr data-c="${r.base}"${pick && tmp.has(r.base) ? ' class="sel"' : ''}>${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${COLS.length}" class="mut">${total ? (!pick && mine && !fav.size ? 'Вы ещё не отметили ни одной монеты. Нажмите «Выбрать монеты» и отметьте нужные.' : !pick && mine ? 'Среди отмеченных монет такой нет.' : 'Под фильтры ничего не подходит.') + (q && /^[A-Z0-9]{2,}$/.test(q) ? ` <a href="?c=${q}" style="text-decoration:underline">Открыть ${q}</a>` : '') : 'Загружаю монеты с бирж…'}</td></tr>`;
-  $('#mine').textContent = (mine ? '☑' : '☐') + ' Только мои' + (fav.size ? ` (${fav.size})` : ''); $('#mine').className = mine ? 'on' : ''; $('#clr').hidden = pick || !(mine && fav.size); for (const id of ['#fv', '#ft', '#fb']) $(id).disabled = mine && !pick;
-  $('#pk').hidden = !pick; $('#pick').hidden = $('#mine').hidden = pick; $('#pkn').textContent = tmp.size;
+  $('#mine').textContent = (mine ? '☑' : '☐') + ' Только мои' + (fav.size ? ` (${fav.size})` : ''); $('#mine').className = mine ? 'on' : ''; $('#clr').hidden = pick || !(mine && fav.size); for (const id of ['#ft', '#fto', '#fb']) $(id).disabled = mine && !pick;
+  $('#pk').hidden = !pick; $('#pick').hidden = $('#mine').hidden = $('#bell').hidden = pick; $('#pkn').textContent = tmp.size;
+  for (const b of document.querySelectorAll('#exs .chip')) { const on = ex.has(b.dataset.x); b.className = 'chip' + (on ? ' on' : ''); b.textContent = (on ? '☑ ' : '☐ ') + b.textContent.replace(/^[☑☐] /, ''); }
+  $('#rst').hidden = pick || !(ex.size < 3 || $('#ft').value !== '1e6' || $('#fto').value || fb);
   $('#cnt').textContent = total ? `показано ${rows.length} из ${total}` : ''; $('#stamp').textContent = bulkOk ? 'обновлено ' + new Date(bulkOk).toLocaleTimeString('ru-RU') : '';
-  sessionStorage.setItem('pl', JSON.stringify({ sort, fv, ft: $('#ft').value, fb }));
+  try { localStorage.setItem('plf', JSON.stringify({ sort, ex: [...ex], ft: $('#ft').value, fto: $('#fto').value, fb })); } catch { /* не страшно */ }
 }
+$('#exs').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; const x = b.dataset.x; if (ex.has(x)) ex.delete(x); else ex.add(x); if (!ex.size) ex = new Set(EXN); bkGen++; drawList(); }; // сняли последнюю — значит, снова все
+$('#ft').oninput = () => { if (+$('#fto').value && +$('#ft').value >= +$('#fto').value) $('#fto').value = ''; drawList(); };      // «от» не меньше «до» — снимаем верхнюю границу
+$('#fto').oninput = () => { if (+$('#fto').value && +$('#ft').value >= +$('#fto').value) $('#ft').value = '0'; drawList(); };      // «до» не больше «от» — снимаем нижнюю
+$('#rst').onclick = () => { ex = new Set(EXN); bkGen++; $('#ft').value = '1e6'; $('#fto').value = ''; $('#fb').value = ''; drawList(); };
 $('#lh').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; sort = sort.k === k ? { k, d: -sort.d } : { k, d: COLS.find(c => c.k === k).txt ? 1 : -1 }; drawHead(); drawList(); };
 const favClick = e => { const f = e.target.closest('input[data-f]'); if (!f) return false; if (f.checked) fav.add(f.dataset.f); else fav.delete(f.dataset.f); saveFav(); return true; };
 $('#mine').onclick = () => { mine = !mine; saveFav(); drawList(); }; $('#clr').onclick = () => { fav.clear(); saveFav(); drawList(); };
@@ -210,7 +268,49 @@ $('#lb').onclick = e => {
     if (e.target !== box) e.preventDefault(); if (on) tmp.add(b); else tmp.delete(b); if (box) box.checked = on; row.classList.toggle('sel', on); $('#pkn').textContent = tmp.size; return;
   }
   if (favClick(e)) { drawList(); return; } const tr = e.target.closest('tr[data-c]'), a = e.target.closest('a[href^="?c="]'); const c = tr ? tr.dataset.c : a ? a.getAttribute('href').slice(3) : ''; if (c) { e.preventDefault(); go(c, true); } };
-for (const id of ['#q', '#fv', '#ft', '#fb']) $(id).oninput = drawList;
+for (const id of ['#q', '#fb']) $(id).oninput = drawList;
+
+// ===================== уведомление в Телеграм =====================
+// Страница только собирает ссылку t.me/<бот>?start=a_<вид>[период]_<значение>_<МОНЕТА>[-МОНЕТА…] (точка в числе — буква p);
+// запоминает уведомление и следит за событием сканер на сервере (signals.mjs, раздел «личные уведомления»).
+const BOT = 'pulstrading_signals_bot';
+const AK = { p: ['Уровень цены', 0], mu: ['На сколько процентов', 3, 1], md: ['На сколько процентов', 3, 1], mm: ['На сколько процентов', 3, 1], bb: ['Доля покупателей, %', 65], bs: ['Доля продавцов, %', 65],
+  ou: ['На сколько процентов', 5, 1], od: ['На сколько процентов', 5, 1], fa: ['Ставка, % (со знаком плюс)', 0.05], fb: ['Ставка, % (со знаком минус)', 0.05], sp: ['Разброс, %', 1] }; // подпись поля, значение по умолчанию, нужен ли период
+const ALIM = { p: [0, Infinity], m: [0.05, 1000], o: [0.05, 1000], b: [51, 99], f: [0.0005, 10], s: [0.05, 100] };
+const numIn = s => parseFloat(String(s).replace(/\s/g, '').replace(',', '.'));
+const enc = x => { const d = Math.min(18, Math.max(0, 7 - Math.floor(Math.log10(x)))); return (+x.toPrecision(8)).toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '').replace('.', 'p'); };
+const alCoin = () => $('#alc').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, '');
+function curPx(b) { // цена монеты на главной площадке: на странице монеты — живая, в списке — из общего списка
+  if (view === 'coin' && coin === b) { const s = VEN.map(v => ST[v.k]).find(s => s && s.d && !s.err && s.d.mid > 0); if (s) return { px: s.d.mid, mult: s.mult, k: s.v.k }; }
+  const c = L.get(b), k = c && prim(c); return k ? { px: c.v[k].px, mult: c.v[k].mult, k } : null;
+}
+function alDraw() {
+  const k = $('#alk').value, K = AK[k], multi = !$('#alml').hidden && $('#alm').checked && k !== 'p', b = alCoin(), v = numIn($('#alv').value), lim = ALIM[k[0]], c = L.get(b), cur = curPx(b);
+  $('#alvt').textContent = K[0]; $('#alwl').hidden = !K[2]; $('#alm').disabled = k === 'p'; $('#alc').disabled = multi;
+  let err = '', note = '', pay = '', coins = [b]; const head = `a_${k}${K[2] ? $('#alw').value : ''}_`;
+  if (multi) { const all = [...fav].filter(x => L.has(x) && !bad.has(x)); coins = []; for (const x of all) { if (coins.length >= 16 || (head + enc(v > 0 ? v : 1) + '_' + [...coins, x].join('-')).length > 64) break; coins.push(x); }
+    if (!coins.length) err = 'В вашем списке нет монет.'; else note = `Монеты: ${coins.join(', ')}.` + (coins.length < all.length ? ` В одну ссылку помещается ${coins.length} из ${all.length} — остальные добавьте по одной.` : ''); }
+  else if (!b) err = 'Укажите монету.'; else if (!c || !cur || bad.has(b)) err = 'Такой монеты в списке нет.';
+  else if ((k[0] === 'o' || k[0] === 'f') && !(c.v.byf?.px > 0 || c.v.gtf?.px > 0)) err = 'По этой монете таких данных нет: нужен фьючерс Bybit или Gate.';
+  else if (k[0] === 'b' && !FUT.some(x => c.v[x]?.px > 0)) err = 'У этой монеты нет фьючерса — стакан не отслеживается.';
+  if (!err && !(v > 0)) err = 'Укажите число больше нуля.'; else if (!err && (v < lim[0] || v > lim[1])) err = `Значение должно быть от ${String(lim[0]).replace('.', ',')} до ${lim[1]}.`;
+  if (!err && k === 'p') { const lvl = v / cur.mult, now = cur.px / cur.mult, up = lvl > now;
+    if (Math.abs(lvl / now - 1) < 1e-4) note = `Сейчас цена ${fp(cur.px)} (${NAME[cur.k]}). Впишите уровень выше или ниже — сообщу, когда цена до него дойдёт.`;
+    else { pay = `a_${up ? 'pa' : 'pb'}_${enc(lvl)}_${b}`; note = `Сообщу, когда цена ${up ? 'поднимется' : 'опустится'} до ${fp(v)}. Сейчас ${fp(cur.px)} (${NAME[cur.k]}), до уровня ${pc((v / cur.px - 1) * 100, 2)}.`; } }
+  else if (!err) { pay = head + enc(v) + '_' + coins.join('-');
+    if (!multi && view === 'list') { const r = rowOf(c); if (r) note = k[0] === 'm' && r.c5 != null ? `Сейчас за 5 минут: ${pc(r.c5, 2)}.` : k[0] === 'b' && c.bk ? `Сейчас покупателей ${Math.round(c.bk.p)} %, продавцов ${Math.round(100 - c.bk.p)} % (${NAME[c.bk.k]}).` : k[0] === 'o' && r.oi5 != null ? `Сейчас за 5 минут: ${pc(r.oi5, 2)}.` : k[0] === 'f' && r.fund != null ? `Сейчас ${pc(r.fund, 4)}.` : k === 'sp' && r.spr != null ? `Сейчас ${fn(r.spr, 2)} %.` : ''; } }
+  if (pay.length > 64) { err = 'Слишком длинно для одной ссылки — выберите меньше монет.'; pay = ''; }
+  $('#ale').textContent = err; $('#aln').textContent = err ? '' : note; const go = $('#algo'); go.classList.toggle('off', !pay); if (pay) go.href = `https://t.me/${BOT}?start=${pay}`; else go.removeAttribute('href');
+}
+function alKind() { const k = $('#alk').value, cur = curPx(alCoin()); if (k === 'p') $('#alm').checked = false; $('#alv').value = k === 'p' ? (cur ? String(+cur.px.toPrecision(5)).replace('.', ',') : '') : String(AK[k][1]).replace('.', ','); alDraw(); } // значение по умолчанию для выбранного события
+function openAl(b) {
+  $('#alcl').innerHTML = [...L.keys()].filter(x => !bad.has(x)).sort().map(x => `<option value="${x}">`).join('');
+  $('#alc').value = b || ''; $('#alml').hidden = view === 'coin' || !fav.size; $('#almn').textContent = fav.size; $('#alm').checked = false; alKind(); $('#al').showModal();
+}
+$('#alk').onchange = alKind; $('#alc').onchange = () => { if ($('#alk').value === 'p') alKind(); else alDraw(); };
+for (const id of ['#alc', '#alv', '#alw', '#alm']) $(id).oninput = alDraw;
+$('#alx').onclick = () => $('#al').close(); $('#al').onclick = e => { if (e.target === $('#al')) $('#al').close(); }; $('#algo').onclick = () => setTimeout(() => $('#al').close(), 400);
+$('#bell').onclick = () => { const q = $('#q').value.trim().toUpperCase(); openAl(L.has(q) ? q : ''); }; $('#dbell').onclick = () => openAl(coin);
 
 // ===================== СТРАНИЦА МОНЕТЫ: подробные данные по каждой площадке =====================
 const VEN = [
@@ -297,7 +397,7 @@ function drawCoin() {
 
 // ===================== переключение «список ↔ монета» =====================
 function show(c) {
-  view = c ? 'coin' : 'list'; $('#list').style.display = c ? 'none' : 'flex'; $('#detail').hidden = !c; $('#back').hidden = $('#rngL').hidden = !c;
+  view = c ? 'coin' : 'list'; $('#list').style.display = c ? 'none' : 'flex'; $('#detail').hidden = !c; $('#back').hidden = $('#rngL').hidden = $('#dbell').hidden = !c;
   document.title = c ? c + ' онлайн — Пульс' : 'Пульс — монеты онлайн';
   if (c) startCoin(c); else { run++; drawHead(); drawList(); }
 }
