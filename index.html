@@ -59,7 +59,41 @@ const badge = k => { const x = STR[k]; return x ? `<span class="badge r${x.risk}
 const card = (title, res, rows, key) => `<div class="trade${STR[key] ? ' r' + STR[key].risk : ''}"><div class="top"><span class="name">${esc(title)}</span><span class="res ${cls(res)}">${m(res)} USDT</span></div>${badge(key)}<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl></div>`;
 
 let LIVE = {}, liveAt = 0;
-const OPEN = { open: true, harv: true, wave: true, closed: true, coins: false };
+const OPEN = { open: true, harv: true, wave: true, closed: true, coins: false, arb: true, lessons: true };
+const VEN = { bys: 'Bybit спот', gts: 'Gate спот', bns: 'Binance спот' };
+// Учебный арбитраж: служба сигналов «покупает» по стакану в момент сигнала, ждёт перевод и «продаёт» на другой бирже по стакану в тот момент
+function arbSec(d) {
+  const a = d.arb; if (!a) return '';
+  const S = a.sum || { n: 0, wins: 0, net: 0, instant: 0, n60: 0, net60: 0, size: 1000, xferMin: 20 }, sz = S.size || 1000, xm = S.xferMin || 20;
+  const row = x => `<tr><td><b>${esc(x.base)}</b><div class="lbl">${t(x.t0)}</div></td><td>${esc(VEN[x.buy] || x.buy)} → ${esc(VEN[x.sell] || x.sell)}</td><td class="${cls(x.instant)}">${m(x.instant)}</td><td class="${cls(x.net)}">${x.net == null ? (x.err ? esc(x.err) : 'идёт перевод…') : m(x.net)}</td><td class="${cls(x.net60)}">${x.net60 == null ? '—' : m(x.net60)}</td></tr>`;
+  const rows = [...(a.open || []), ...(a.closed || [])].map(row).join('');
+  return `<details class="sec" data-k="arb" ${OPEN.arb ? 'open' : ''}><summary><h2>Арбитраж — учебный, на бумаге (${S.n})</h2></summary>
+<p class="note">Проверяем, можно ли заработать на разнице цен между биржами, если покупать и переводить монету. На каждый арбитражный сигнал бот «покупает» на ${sz} USDT по настоящему стакану биржи в момент сигнала, «переводит» монету ${xm} минут и «продаёт» на другой бирже по стакану в тот момент — с комиссиями бирж. Денег и заявок нет. Для сравнения: «мгновенно» — если монета заранее лежит на бирже продажи (покупка и продажа в одну секунду), «через 60 мин» — если перевод шёл час. Плата за вывод учтена только у Binance.</p>
+<div class="tiles"><div class="tile"><div class="lbl">С переводом ${xm} мин</div><div class="big ${cls(S.net)}">${m(S.net)}</div><div class="lbl">USDT за ${S.n} сделок, в плюс ${S.wins}</div></div>
+<div class="tile"><div class="lbl">Мгновенно</div><div class="big ${cls(S.instant)}">${m(S.instant)}</div><div class="lbl">USDT, если монета уже на бирже</div></div>
+<div class="tile"><div class="lbl">Перевод 60 мин</div><div class="big ${cls(S.net60)}">${m(S.net60)}</div><div class="lbl">USDT за ${S.n60} сделок</div></div></div>
+${rows ? `<div class="tw"><table><thead><tr><th>Монета</th><th>Купить → продать</th><th>Мгновенно, USDT</th><th>С переводом ${xm} мин, USDT</th><th>Через 60 мин, USDT</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="empty">Сделок пока нет: арбитражный сигнал бывает 1–2 раза в сутки.</p>'}
+<p class="note">Учёт ведётся с ${t(a.since)}. Вывод делаем после 20–30 сделок: если «с переводом» в минусе, а «мгновенно» в плюсе — значит, трейдеры правы и зарабатывать можно только с деньгами, заранее разложенными по обеим биржам.</p></details>`;
+}
+// Разбор ошибок: каждая убыточная сделка — причина и урок; ожидание по проверке на истории против того, что вышло вживую
+const LESSON = [
+  [x => x.kind === 'harvest' && /30 %/.test(x.why || ''), 'Резкий рост монеты — страховочный выход', 'Цена монеты за сутки выросла на 30 %. Спот и шорт стоят на разных биржах и на резком движении разошлись по цене — расхождение съело выплаты. Урок: у пар «спот Gate + шорт Bybit» главный риск — расхождение бирж на резких монетах.'],
+  [x => x.kind === 'harvest' && (+x.spot + +x.short) < -1, 'Спот и шорт разошлись по цене', 'Пара должна быть нейтральной: насколько упал спот, настолько вырос шорт. Здесь части разошлись больше чем на 1 USDT (разные биржи или разное исполнение). Урок: следить за расхождением цен бирж и не брать слишком резкие монеты.'],
+  [x => x.kind === 'harvest' && /минус/.test(x.why || ''), 'Выплаты сменили знак слишком рано', 'Пару закрыли, когда финансирование ушло в минус, а выплат ещё не набралось на комиссии входа и выхода (≈0,31 %). Урок: входить только при долго устойчивом финансировании, пара должна жить хотя бы несколько дней.'],
+  [x => /стоп/.test(x.why || ''), 'Сработал стоп', 'Цена пошла против сделки и дошла до защитной цены. Стоп ограничил убыток — это нормальная часть правила, но частые стопы значат, что направление угадывается хуже, чем на истории.'],
+  [x => /времени/.test(x.why || ''), 'Закрыто по времени в минус', 'За отведённые 12 часов перекос не исправился, сделка закрыта с небольшим минусом.'],
+  [x => true, 'Другое', 'Убыток по прочим причинам.'],
+];
+function lessonsSec(d, cl) {
+  const losses = cl.filter(x => (num(x.real) ?? num(x.pnl) ?? 0) < 0); if (!cl.length) return '';
+  const g = new Map(); for (const x of losses) { const L = LESSON.find(l => l[0](x)); const k = L[1]; if (!g.has(k)) g.set(k, { L, n: 0, sum: 0, coins: [] }); const e = g.get(k); e.n++; e.sum += num(x.real) ?? num(x.pnl) ?? 0; e.coins.push(x.symbol.replace('USDT', '')); }
+  const items = [...g.values()].sort((a, b) => a.sum - b.sum).map(e => `<div class="trade"><div class="top"><span class="name">${esc(e.L[1])} · ${e.n}</span><span class="res neg">${m(e.sum)} USDT</span></div><p class="note" style="margin:6px 0">${esc(e.L[2])}</p><div class="lbl">Монеты: ${esc(e.coins.join(', '))}</div></div>`).join('');
+  const pd = (d.strategies || []).find(x => x.key === 'pendulum'), dn = d.dir?.n || 0;
+  const exp = pd && dn ? `<p class="note">«${esc(pd.name)}»: по проверке на истории ожидалось в среднем +0,42 % на сделку, вживую вышло ${m((d.dir.real ?? d.dir.pnl) / dn / 250 * 100)} % за ${dn} сделок. На таком числе сделок разница ещё может быть случайной; если она сохранится на 30+ сделках — правило пересматривается.</p>` : '';
+  return `<details class="sec" data-k="lessons" ${OPEN.lessons ? 'open' : ''}><summary><h2>Разбор ошибок (${losses.length} из ${cl.length})</h2></summary>
+<p class="note">Каждая убыточная сделка разобрана: почему закрылась в минус и какой из этого урок. Сверху — причины, которые стоили дороже всего. Уроки не применяются вслепую: изменение правила сначала проверяется на истории (подбор на одной части, проверка на другой) и включается, только если даёт плюс после комиссий.</p>
+${exp}<div class="list">${items || '<p class="empty">Убыточных сделок нет.</p>'}</div></details>`;
+}
 try { Object.assign(OPEN, JSON.parse(localStorage.getItem('pulse-open') || '{}')); } catch (e) {}
 document.addEventListener('toggle', e => { const k = e.target?.dataset?.k; if (!k) return; OPEN[k] = e.target.open; try { localStorage.setItem('pulse-open', JSON.stringify(OPEN)); } catch (e) {} }, true);
 function coinsSec(d) {
@@ -116,6 +150,8 @@ ${state}
 <details class="sec" data-k="open" ${OPEN.open ? "open" : ""}><summary><h2>«${esc(STR.pendulum.name)}» — открытые сделки (${op.length})</h2></summary>${badge('pendulum')}<p class="note">Режим сейчас: ${on(d.modes?.risk)}. Вход против стороны, которая переплачивает за свою позицию. Сделка ещё не закрыта: число справа — сколько было бы в плюсе или минусе, если закрыть прямо сейчас; оно меняется вместе с ценой. Стоп и тейк стоят на бирже. Сверху — самые прибыльные.</p><div class="list">${openC}</div></details>
 <details class="sec" data-k="harv" ${OPEN.harv ? "open" : ""}><summary><h2>«${esc(STR.anchor.name)}» — сбор финансирования (${hv.length})</h2></summary>${badge('anchor')}<p class="note">Режим сейчас: ${on(d.modes?.safe)}. Получено выплат по открытым парам: ${hfund.toFixed(3)} USDT${hasPay ? ` (${hpay} выплат)` : ''}. Монета куплена на споте и столько же продано на фьючерсе: цена почти не влияет, доход — выплаты каждые 8 часов (03:00, 11:00, 19:00 МСК). Число справа — итог пары целиком: спот + шорт + полученные выплаты − комиссии входа; выплаты уже внутри него, отдельно они показаны строкой «Выплаты».</p><div class="list">${harvC}</div></details>
 ${pfSec}
+${arbSec(d)}
+${lessonsSec(d, cl)}
 ${coinsSec(d)}
 <details class="sec" data-k="closed" ${OPEN.closed ? "open" : ""}><summary><h2>Закрытые сделки (${cl.length})</h2></summary><p class="note">Сверху — самые прибыльные, внизу — убыточные. Сделки «${esc(STR.pendulum.name)}» показаны за последние 7 дней, пары «${esc(STR.anchor.name)}» — все; итог за всё время — в таблице ниже.</p><div class="list">${closedC}</div></details>
 ${sumSec}
