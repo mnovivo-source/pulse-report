@@ -61,7 +61,18 @@ const card = (title, res, rows, key) => `<div class="trade${STR[key] ? ' r' + ST
 
 let LIVE = {}, liveAt = 0;
 const OPEN = { open: true, harv: true, wave: true, closed: true, coins: false, arb: true, lessons: true };
-const VEN = { bys: 'Bybit спот', gts: 'Gate спот', bns: 'Binance спот' };
+const VEN = { bys: 'Bybit спот', gts: 'Gate спот', bns: 'Binance спот', byf: 'Bybit фьючерс', bnf: 'Binance фьючерс', gtf: 'Gate фьючерс' };
+function shortBlock(a) { // идея 20.11: после сигнала продать фьючерс там, где дорого (монеты и перевод не нужны)
+  const S = a.sumShort, list = a.shorts || []; if (!S && !list.length) return '';
+  const Z = S || { n: 0, wins: 0, net5: 0, net15: 0, net60: 0, n60: 0 };
+  const rows = list.map(x => `<tr><td><b>${esc(x.base)}</b><div class="lbl">${t(x.t0)}</div></td><td>${esc(VEN[x.mk] || x.mk)}</td><td class="${cls(x.net5)}">${x.net5 == null ? '…' : m(x.net5)}</td><td class="${cls(x.net15)}">${x.net15 == null ? '…' : m(x.net15)}</td><td class="${cls(x.net60)}">${x.net60 == null ? '…' : m(x.net60)}</td></tr>`).join('');
+  return `<h2 style="margin-top:14px">Идея: продать фьючерс там, где дорого</h2>
+<p class="note">Монеты и перевод не нужны. По первым 11 сигналам разница почти всегда закрывалась тем, что цена на дорогой бирже падала. Проверяем: в момент сигнала бот «продаёт» фьючерс этой монеты на 1000 USDT по стакану и «откупает» через 5, 15 и 60 минут, с комиссиями. На бумаге, заявок нет.</p>
+<div class="tiles"><div class="tile"><div class="lbl">Через 15 мин</div><div class="big ${cls(Z.net15)}">${m(Z.net15)}</div><div class="lbl">USDT за ${Z.n} сделок, в плюс ${Z.wins}</div></div>
+<div class="tile"><div class="lbl">Через 5 мин</div><div class="big ${cls(Z.net5)}">${m(Z.net5)}</div><div class="lbl">USDT</div></div>
+<div class="tile"><div class="lbl">Через 60 мин</div><div class="big ${cls(Z.net60)}">${m(Z.net60)}</div><div class="lbl">USDT за ${Z.n60} сделок</div></div></div>
+${rows ? `<div class="tw"><table><thead><tr><th>Монета</th><th>Где продали</th><th>5 мин</th><th>15 мин</th><th>60 мин</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="empty">Сделок пока нет — первая будет при следующем арбитражном сигнале.</p>'}`;
+}
 // Учебный арбитраж: служба сигналов «покупает» по стакану в момент сигнала, ждёт перевод и «продаёт» на другой бирже по стакану в тот момент
 function arbSec(d) {
   const a = d.arb; if (!a) return '';
@@ -74,6 +85,7 @@ function arbSec(d) {
 <div class="tile"><div class="lbl">Мгновенно</div><div class="big ${cls(S.instant)}">${m(S.instant)}</div><div class="lbl">USDT, если монета уже на бирже</div></div>
 <div class="tile"><div class="lbl">Перевод 60 мин</div><div class="big ${cls(S.net60)}">${m(S.net60)}</div><div class="lbl">USDT за ${S.n60} сделок</div></div></div>
 ${rows ? `<div class="tw"><table><thead><tr><th>Монета</th><th>Купить → продать</th><th>Мгновенно, USDT</th><th>С переводом ${xm} мин, USDT</th><th>Через 60 мин, USDT</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="empty">Сделок пока нет: арбитражный сигнал бывает 1–2 раза в сутки.</p>'}
+${shortBlock(a)}
 <p class="note">Учёт ведётся с ${t(a.since)}. Вывод делаем после 20–30 сделок: если «с переводом» в минусе, а «мгновенно» в плюсе — значит, трейдеры правы и зарабатывать можно только с деньгами, заранее разложенными по обеим биржам.</p></details>`;
 }
 // Разбор ошибок: каждая убыточная сделка — причина и урок; ожидание по проверке на истории против того, что вышло вживую
